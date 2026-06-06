@@ -1,294 +1,267 @@
 # SC Chatbot — Trợ lý AI cho Thương mại Xã hội
 
-Multi-tenant chatbot SaaS theo SRS [`SC-Chatbot-SRS.docx`](SC-Chatbot-SRS.docx).
-Đã **bỏ phần Zalo OA**, thay bằng HTTP API + web UI để demo/test trực tiếp.
+Nền tảng chatbot **multi-tenant** cho SME bán hàng online, xây theo SRS [`SC-Chatbot-SRS.docx`](SC-Chatbot-SRS.docx).
+Bot tư vấn sản phẩm/dịch vụ, trả lời FAQ dựa trên tri thức riêng của từng shop (RAG), xử lý đơn hàng & đặt lịch, và có trang quản trị để theo dõi KPI.
+
+Phần Zalo OA trong SRS được thay bằng **HTTP API + UI chat web + bot Telegram** để demo/test trực tiếp.
 
 ---
 
-## 1. Tổng quan
+## 1. Kiến trúc tổng quan
+
+Hệ thống gồm **3 service độc lập** trong thư mục [`services/`](services/):
+
+```
+                    ┌─────────────────┐
+   Telegram  ─────► │                 │
+   Web chat UI ───► │   chatbot-api   │ ──(REST + X-API-Key)──► client-server
+   (port 8000)      │   (FastAPI)     │                         (port 8001)
+                    │   LLM + RAG     │                         products / orders
+   web-admin ─────► │                 │                         bookings (mock API)
+   (port 5173)      └─────────────────┘
+```
+
+| Service | Vai trò | Stack | Port |
+|---|---|---|---|
+| [**chatbot-api**](services/chatbot-api/) | Bộ não AI: LLM agent, RAG, tools, lịch sử hội thoại, admin API, Telegram worker | Python · FastAPI · LangChain · FAISS · HuggingFace embeddings | 8000 |
+| [**client-server**](services/client-server/) | API nghiệp vụ giả lập (sản phẩm/đơn/booking), bảo vệ bằng API key | Python · FastAPI | 8001 |
+| [**web-admin**](services/web-admin/) | Trang quản trị: dashboard KPI, knowledge base, system prompt, hội thoại | React · Vite · TypeScript · Tailwind | 5173 |
+
+---
+
+## 2. Công nghệ chính
 
 | Thành phần | Công nghệ |
 |---|---|
-| Ngôn ngữ | Python 3.11 |
-| LLM orchestration | LangChain 1.2 (`create_agent` / LangGraph) |
-| LLM | Azure OpenAI — deployment `gpt-4` (model `gpt-4.1`) |
-| Embeddings | HuggingFace `paraphrase-multilingual-MiniLM-L12-v2` (local, offline) |
-| Vector DB | FAISS (mỗi tenant 1 index) |
-| NoSQL | TinyDB (JSON-backed) cho hội thoại, đơn hàng, booking, analytics |
+| Ngôn ngữ backend | Python 3.10+ (test trên 3.11) |
+| LLM orchestration | LangChain (`create_agent` / LangGraph) |
+| LLM | Azure OpenAI (mặc định) hoặc OpenAI / OpenAI-compatible (Ollama, vLLM…) |
+| Embeddings | HuggingFace `paraphrase-multilingual-MiniLM-L12-v2` (local, offline) — hỗ trợ tiếng Việt |
+| Vector DB | FAISS — mỗi tenant 1 index |
+| Lưu hội thoại | TinyDB (JSON local, mặc định) **hoặc** MongoDB — switch bằng `STORAGE_BACKEND` |
 | Web framework | FastAPI + uvicorn |
-| UI demo | HTML/JS single-page tại `/` |
+| Kênh giao tiếp | Web chat UI (`/`) · Telegram (polling) |
+| Frontend admin | React + Vite + TypeScript + Tailwind |
 
 ---
 
-## 2. Cấu trúc thư mục
+## 3. Cấu trúc thư mục
 
 ```
 sc-chatbot/
-├── .env                  # secrets (KHÔNG commit)
-├── .env.example          # template
-├── requirements.txt
-├── run.py                # entry point
-├── seed_data.py          # nạp tenant demo
+├── start.sh                 # khởi động toàn bộ stack (tự cài deps + seed lần đầu)
+├── stop.sh                  # dừng toàn bộ stack
+├── README.md                # file này
+├── RUN.md                   # hướng dẫn chạy chi tiết từng bước
+├── chatbot-build-spec.md
+├── SC-Chatbot-SRS.docx
 │
-├── app/
-│   ├── config.py         # đọc env
-│   ├── tenancy.py        # multi-tenant context
-│   │
-│   ├── core/
-│   │   ├── llm.py        # Azure / OpenAI / HF factory
-│   │   ├── agent.py      # LangChain agent + RAG
-│   │   ├── memory.py     # lịch sử hội thoại (TinyDB)
-│   │   └── analytics.py  # KPI tracking
-│   │
-│   ├── knowledge/
-│   │   ├── vectorstore.py  # FAISS wrapper per-tenant
-│   │   └── ingest.py       # crawl URL / load file / chunk
-│   │
-│   ├── tools/            # Function Calling
-│   │   ├── faq.py        # search_knowledge_base
-│   │   ├── product.py    # get / search / suggest
-│   │   ├── order.py      # check_stock / create_order / lookup
-│   │   └── booking.py    # check_tour_availability / create_booking
-│   │
-│   └── api/
-│       ├── schemas.py    # Pydantic models
-│       └── server.py     # FastAPI routes
-│
-├── ui/index.html         # chat UI
-├── seed/                 # dữ liệu mẫu
-│   ├── beauty/{products.json, faq.md}
-│   └── travel/{products.json, faq.md}
-└── data/                 # runtime — tự tạo, mỗi tenant 1 folder
+└── services/
+    ├── chatbot-api/         # === Bộ não AI ===
+    │   ├── run.py                  # entry point HTTP server (port 8000)
+    │   ├── telegram_worker.py      # worker polling Telegram
+    │   ├── seed_data.py            # seed tenant demo + knowledge base
+    │   ├── migrate_history_to_mongo.py
+    │   ├── app/
+    │   │   ├── config.py           # đọc .env
+    │   │   ├── tenancy.py          # multi-tenant context
+    │   │   ├── core/
+    │   │   │   ├── llm.py          # factory Azure / OpenAI / HF
+    │   │   │   ├── agent.py        # LangChain agent + RAG
+    │   │   │   ├── memory.py       # lịch sử hội thoại
+    │   │   │   ├── mongo.py        # kết nối MongoDB (khi STORAGE_BACKEND=mongo)
+    │   │   │   └── analytics.py    # tracking KPI
+    │   │   ├── knowledge/
+    │   │   │   ├── vectorstore.py  # FAISS wrapper per-tenant
+    │   │   │   └── ingest.py       # crawl URL / load file / chunk
+    │   │   ├── tools/              # Function Calling
+    │   │   │   ├── faq.py          # search_knowledge_base
+    │   │   │   ├── product.py      # get / search / suggest products
+    │   │   │   ├── order.py        # check_stock / create_order / lookup
+    │   │   │   └── booking.py      # check_tour_availability / create_booking
+    │   │   ├── integrations/
+    │   │   │   ├── client_server.py # gọi REST sang client-server
+    │   │   │   └── telegram_bot.py  # handler Telegram
+    │   │   ├── admin/              # API cho web-admin
+    │   │   │   ├── auth.py         # login JWT
+    │   │   │   ├── routes.py       # /admin/* endpoints
+    │   │   │   ├── documents.py    # upload/quản lý tài liệu KB
+    │   │   │   ├── configs.py      # override system prompt theo tenant
+    │   │   │   └── aggregations.py # số liệu dashboard
+    │   │   └── api/
+    │   │       ├── schemas.py      # Pydantic models
+    │   │       └── server.py       # FastAPI routes chính
+    │   ├── ui/index.html           # chat UI demo
+    │   ├── seed/                   # dữ liệu mẫu (beauty / travel)
+    │   └── data/                   # runtime — tự tạo, mỗi tenant 1 folder (gitignored)
+    │
+    ├── client-server/       # === API nghiệp vụ (mock) ===
+    │   ├── run.py                  # entry point (port 8001)
+    │   ├── seed_data.py
+    │   ├── app/
+    │   │   ├── main.py             # FastAPI app
+    │   │   ├── auth.py             # check header X-API-Key
+    │   │   ├── storage.py          # in-memory store
+    │   │   ├── schemas.py
+    │   │   └── routes/             # products / orders / bookings
+    │   └── seed/                   # products.json / spa.json / travel.json
+    │
+    └── web-admin/           # === Trang quản trị (React) ===
+        ├── src/
+        │   ├── api.ts              # gọi chatbot-api /admin/*
+        │   ├── auth.tsx            # context đăng nhập JWT
+        │   ├── pages/              # Login / Stats / Documents / Prompt / Conversations
+        │   └── components/         # Layout / Protected / TenantSelector / Icons
+        ├── package.json
+        └── vite.config.ts
 ```
 
 ---
 
-## 3. Cài đặt
+## 4. Chức năng theo service
 
-### 3.1. Yêu cầu
-- Python 3.10+ (đã test trên 3.11)
-- Windows / macOS / Linux
-- ~500MB ổ cứng (gồm FAISS + HF embedding model)
-- Internet (lần đầu để tải HF model + gọi Azure OpenAI)
+### 4.1. chatbot-api — Bộ não AI
 
-### 3.2. Cài dependencies
-```powershell
-pip install -r requirements.txt
-```
+- **Multi-tenant**: mỗi shop (tenant) có vector index, lịch sử, system prompt riêng — cách ly bởi [`app/tenancy.py`](services/chatbot-api/app/tenancy.py).
+- **LLM Agent + Function Calling**: agent tự quyết định gọi tool nào dựa trên câu hỏi ([`app/core/agent.py`](services/chatbot-api/app/core/agent.py)):
+  - `search_knowledge_base` — RAG, tìm trong tri thức của tenant
+  - `get_product` / `search_products` / `suggest_products` — tra cứu & gợi ý sản phẩm
+  - `check_stock` / `create_order` / `lookup_order` — xử lý đơn hàng
+  - `check_tour_availability` / `create_booking` — đặt lịch/tour
+- **RAG**: nạp tri thức từ text / URL / folder, chunk + embed (HuggingFace) rồi index vào FAISS ([`app/knowledge/`](services/chatbot-api/app/knowledge/)).
+- **Lịch sử hội thoại**: nhớ ngữ cảnh theo `session_id`, lưu TinyDB hoặc MongoDB ([`app/core/memory.py`](services/chatbot-api/app/core/memory.py)).
+- **Kênh giao tiếp**: chat UI web tại `/`, và bot Telegram chạy nền qua [`telegram_worker.py`](services/chatbot-api/telegram_worker.py).
+- **Admin API** (`/admin/*`): login JWT, upload/xoá tài liệu KB, override system prompt, thống kê — phục vụ web-admin.
+- **Analytics/KPI**: track message, FAQ hit, đơn, booking, CSAT, latency ([`app/core/analytics.py`](services/chatbot-api/app/core/analytics.py)).
 
-### 3.3. Cấu hình `.env`
-Đã có sẵn `.env` cho Azure OpenAI:
-```env
-LLM_PROVIDER=azure
-AZURE_OPENAI_ENDPOINT=https://np-chatbot.openai.azure.com/
-AZURE_OPENAI_API_KEY=<your-key>
-AZURE_OPENAI_API_VERSION=2024-10-21
-AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4
-LLM_TEMPERATURE=0.2
+### 4.2. client-server — API nghiệp vụ (mock)
 
-EMBEDDING_PROVIDER=huggingface
-HF_EMBED_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+- Giả lập backend của shop: `products`, `orders`, `bookings` ([`app/routes/`](services/client-server/app/routes/)).
+- Mọi request phải kèm header `X-API-Key` khớp `INTERNAL_API_KEY` ([`app/auth.py`](services/client-server/app/auth.py)) → trả `401` nếu thiếu/sai.
+- Dùng in-memory store (restart mất data đơn/booking; seed sản phẩm/dịch vụ tự nạp lại từ JSON).
+- Swagger docs: `http://localhost:8001/docs`.
 
-DATA_DIR=./data
-DEFAULT_TENANT=demo-beauty
-```
+### 4.3. web-admin — Trang quản trị
 
-> **Bảo mật:** key Azure trong `.env` đã liệt vào `.gitignore`. Sau demo nên Regenerate Key trong Azure portal.
+Đăng nhập bằng `ADMIN_USER` / `ADMIN_PASSWORD` (cấu hình ở `.env` của chatbot-api). Các trang ([`src/pages/`](services/web-admin/src/pages/)):
 
----
-
-## 4. Khởi động
-
-### Bước 1 — Seed dữ liệu demo *(chỉ chạy 1 lần)*
-```powershell
-python seed_data.py
-```
-
-Output mong đợi:
-```json
-[
-  {"tenant_id": "demo-beauty", "products": 4, "kb_chunks": 9},
-  {"tenant_id": "demo-travel", "products": 3, "kb_chunks": 7}
-]
-```
-
-> Lần đầu sẽ tải model HuggingFace (~80MB). Lần sau cache lại, chạy nhanh.
-
-### Bước 2 — Chạy server
-```powershell
-python run.py
-```
-
-Mở browser: **http://localhost:8000**
-
-UI có:
-- Dropdown chọn tenant
-- Khung chat
-- Nút CSAT 1–5⭐
-
----
-
-## 5. Kịch bản test
-
-### Tenant `demo-beauty` (mỹ phẩm)
-
-| Câu hỏi | Tool bot sẽ gọi |
+| Trang | Chức năng |
 |---|---|
-| "Serum Vitamin C có dùng được cho da nhạy cảm không?" | `search_knowledge_base` |
-| "Tư vấn sản phẩm cho da dầu mụn" | `suggest_products` |
-| "Cho mình thông tin sản phẩm BTY-SR01" | `get_product` |
-| "Đặt 1 kem chống nắng giao Hà Nội" | hỏi tên / SĐT / địa chỉ → `check_stock` → `create_order` |
-| "Tra cứu đơn ORD-XXXXXXXX" | `lookup_order` |
-
-### Tenant `demo-travel` (du lịch)
-
-| Câu hỏi | Tool bot sẽ gọi |
-|---|---|
-| "Tour Đà Nẵng 3N2Đ giá bao nhiêu?" | `search_knowledge_base` / `get_product` |
-| "Tour Phú Quốc còn chỗ ngày 2026-06-15 cho 2 người không?" | `check_tour_availability` |
-| "Đặt tour đó luôn, tôi tên Nam, SĐT 0901234567" | `create_booking` |
-| "Chính sách hoàn hủy tour?" | `search_knowledge_base` |
+| **Dashboard / Stats** | Tổng hội thoại, số câu hỏi, conversion rate, latency, biểu đồ Q&A |
+| **Knowledge base** | Upload PDF/DOCX/TXT/MD theo tenant, xem trạng thái embedding, xoá doc |
+| **System prompt** | Override prompt cho từng tenant (để trống = template mặc định) |
+| **Hội thoại** | Phân trang sessions, click để xem toàn bộ message |
 
 ---
 
-## 6. API endpoints
+## 5. Khởi động nhanh
+
+> Yêu cầu: **Python 3.10+**, **Node.js ≥ 18**. Chạy script bằng **Git Bash** (Windows) hoặc terminal (macOS/Linux).
+
+```bash
+# Lần đầu: tự tạo .venv, cài pip deps + npm, seed dữ liệu, rồi chạy cả 4 tiến trình
+./start.sh
+
+# Dừng tất cả
+./stop.sh        # hoặc nhấn Ctrl+C ở terminal đang chạy start.sh
+```
+
+Sau khi chạy:
+- chatbot-api : http://localhost:8000 (UI chat + `/docs`)
+- client-server : http://localhost:8001/docs
+- web-admin : http://localhost:5173
+- Telegram : worker polling (log ở `logs/telegram-worker.log`)
+
+Cờ bổ sung:
+```bash
+./start.sh --install   # ép cài lại deps (pip + npm)
+./start.sh --seed      # ép seed lại knowledge base
+./start.sh -h          # xem help
+```
+
+> Cần cấu hình thủ công (Telegram token, key Azure…), chạy MongoDB, hoặc làm từng bước thay vì dùng script → xem **[RUN.md](RUN.md)**.
+
+---
+
+## 6. Cấu hình `.env`
+
+Mỗi service có `.env.example` riêng — copy thành `.env` và điền giá trị:
+
+- [`services/chatbot-api/.env.example`](services/chatbot-api/.env.example) — LLM provider, Azure/OpenAI key, embeddings, Telegram token, admin JWT, `STORAGE_BACKEND`, Mongo URI.
+- [`services/client-server/.env.example`](services/client-server/.env.example) — `INTERNAL_API_KEY`, `PORT`.
+- [`services/web-admin/.env.example`](services/web-admin/.env.example) — `VITE_API_BASE_URL` (trỏ tới chatbot-api).
+
+> **Bảo mật:** tất cả file `.env` đã nằm trong `.gitignore`, không commit. Sau demo nên Regenerate key Azure trong portal.
+
+---
+
+## 7. API chatbot-api (tham khảo)
 
 | Method | Path | Mô tả |
 |---|---|---|
 | GET  | `/` | Web UI chat |
 | GET  | `/health` | Healthcheck |
-| GET  | `/tenants` | List tenant đã đăng ký |
-| POST | `/tenants` | Tạo tenant mới `{tenant_id, name, industry}` |
-| POST | `/chat` | Chat: `{tenant_id, session_id, message}` |
-| GET  | `/sessions/{session_id}?tenant_id=...` | Xem lịch sử hội thoại |
-| POST | `/ingest` | Nạp tri thức: `{tenant_id, text|url|folder, source}` |
+| GET  | `/tenants` | List tenant |
+| POST | `/tenants` | Tạo tenant `{tenant_id, name, industry}` |
+| POST | `/chat` | Chat `{tenant_id, session_id, message}` |
+| GET  | `/sessions/{session_id}?tenant_id=...` | Lịch sử hội thoại |
+| POST | `/ingest` | Nạp tri thức `{tenant_id, text\|url\|folder, source}` |
 | GET  | `/analytics/{tenant_id}` | Báo cáo KPI |
-| POST | `/csat` | Khách chấm điểm: `{tenant_id, session_id, score}` |
+| POST | `/csat` | Khách chấm điểm `{tenant_id, session_id, score}` |
+| *    | `/admin/*` | Endpoints cho web-admin (yêu cầu JWT) |
 
-### Ví dụ gọi `/chat` bằng curl
+Ví dụ gọi `/chat`:
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -d '{
-    "tenant_id": "demo-beauty",
-    "session_id": "s-test-001",
-    "message": "Cho tôi xem các serum dưỡng sáng dưới 500k"
-  }'
-```
-
-### Ví dụ nạp thêm tri thức từ URL
-```bash
-curl -X POST http://localhost:8000/ingest \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tenant_id": "demo-beauty",
-    "url": "https://glow-beauty.vn/blog/cach-cham-soc-da-mua-he"
-  }'
+  -d '{"tenant_id":"demo-beauty","session_id":"s-test-001","message":"Cho tôi xem các serum dưỡng sáng dưới 500k"}'
 ```
 
 ---
 
-## 7. Onboard tenant mới (SME)
+## 8. Kịch bản test
 
-### 7.1. Tạo tenant
+### Tenant `demo-beauty` (mỹ phẩm)
+| Câu hỏi | Tool bot gọi |
+|---|---|
+| "Serum Vitamin C có dùng được cho da nhạy cảm không?" | `search_knowledge_base` |
+| "Tư vấn sản phẩm cho da dầu mụn" | `suggest_products` |
+| "Đặt 1 kem chống nắng giao Hà Nội" | hỏi tên/SĐT/địa chỉ → `check_stock` → `create_order` |
+| "Tra cứu đơn ORD-XXXX" | `lookup_order` |
+
+### Tenant `demo-travel` (du lịch)
+| Câu hỏi | Tool bot gọi |
+|---|---|
+| "Tour Đà Nẵng 3N2Đ giá bao nhiêu?" | `search_knowledge_base` / `get_product` |
+| "Tour Phú Quốc còn chỗ ngày 2026-06-15 cho 2 người không?" | `check_tour_availability` |
+| "Đặt tour đó luôn, tôi tên Nam, SĐT 0901234567" | `create_booking` |
+
+---
+
+## 9. Onboard tenant mới (SME)
+
 ```bash
+# 1. Tạo tenant
 curl -X POST http://localhost:8000/tenants \
   -H "Content-Type: application/json" \
-  -d '{
-    "tenant_id": "shop-abc",
-    "name": "Shop ABC",
-    "industry": "electronics"
-  }'
+  -d '{"tenant_id":"shop-abc","name":"Shop ABC","industry":"electronics"}'
+
+# 2. Nạp tri thức (chọn 1 trong 3)
+curl -X POST http://localhost:8000/ingest -d '{"tenant_id":"shop-abc","url":"https://shop-abc.vn/about"}'
+curl -X POST http://localhost:8000/ingest -d '{"tenant_id":"shop-abc","text":"Chính sách bảo hành: ...","source":"warranty.md"}'
+curl -X POST http://localhost:8000/ingest -d '{"tenant_id":"shop-abc","folder":"./seed/shop-abc"}'
 ```
 
-### 7.2. Nạp tri thức
-Có 3 cách:
-
-**Cách A — Crawl trực tiếp 1 URL:**
-```bash
-curl -X POST http://localhost:8000/ingest \
-  -d '{"tenant_id":"shop-abc", "url":"https://shop-abc.vn/about"}'
-```
-
-**Cách B — Đẩy text trực tiếp:**
-```bash
-curl -X POST http://localhost:8000/ingest \
-  -d '{"tenant_id":"shop-abc", "text":"Chính sách bảo hành: ...", "source":"warranty.md"}'
-```
-
-**Cách C — Load cả folder Markdown / TXT / HTML:**
-```bash
-curl -X POST http://localhost:8000/ingest \
-  -d '{"tenant_id":"shop-abc", "folder":"./seed/shop-abc"}'
-```
-
-### 7.3. Nạp sản phẩm
-Hiện tại import bằng cách bỏ JSON sản phẩm vào `data/<tenant_id>/products.json` (cùng format với `seed/beauty/products.json`). Có thể mở rộng thành endpoint `/products/bulk` nếu cần.
+Hoặc dùng trang **Knowledge base** trong web-admin để upload file trực tiếp.
 
 ---
 
-## 8. KPI Dashboard
+## 10. Tuỳ biến LLM
 
-```bash
-curl http://localhost:8000/analytics/demo-beauty
-```
-
-Trả về:
-```json
-{
-  "report": {
-    "tenant_id": "demo-beauty",
-    "events": {
-      "message_in": 12,
-      "message_out": 12,
-      "faq_hit": 5,
-      "product_view": 3,
-      "order_created": 1,
-      "csat_rated": 2,
-      "response_latency_ms": 12
-    },
-    "avg_response_latency_ms": 1483.2,
-    "avg_csat": 4.5,
-    "messages_in": 12,
-    "bookings_created": 0,
-    "orders_created": 1,
-    "conversion_rate": 0.083
-  }
-}
-```
-
-Các chỉ số khớp với KPI trong SRS:
-- Tốc độ phản hồi trung bình → `avg_response_latency_ms`
-- Tỷ lệ chuyển đổi → `conversion_rate`
-- Số câu hỏi xử lý / ngày → `messages_in`
-- CSAT → `avg_csat`
-
----
-
-## 9. Map yêu cầu SRS → code
-
-| Mục SRS | File |
-|---|---|
-| Multi-tenant | [app/tenancy.py](app/tenancy.py) |
-| Function Calling | [app/core/agent.py](app/core/agent.py) + [app/tools/](app/tools/) |
-| FAQ & tư vấn sâu | [app/tools/faq.py](app/tools/faq.py), [app/tools/product.py](app/tools/product.py) |
-| Gợi ý sản phẩm | [app/tools/product.py](app/tools/product.py) — `suggest_products` |
-| Xử lý đơn hàng + tra cứu | [app/tools/order.py](app/tools/order.py) |
-| Thu thập thông tin động + Gọi API | [app/tools/booking.py](app/tools/booking.py), [app/tools/order.py](app/tools/order.py) |
-| NoSQL lưu hội thoại | [app/core/memory.py](app/core/memory.py) |
-| Vector DB + crawl | [app/knowledge/vectorstore.py](app/knowledge/vectorstore.py), [app/knowledge/ingest.py](app/knowledge/ingest.py) |
-| Analytics & KPI | [app/core/analytics.py](app/core/analytics.py), `GET /analytics/{tenant_id}` |
-| Bỏ Zalo OA → thay HTTP API + UI | [app/api/server.py](app/api/server.py), [ui/index.html](ui/index.html) |
-
----
-
-## 10. Tuỳ biến
-
-### Đổi LLM
-Hỗ trợ 3 chế độ trong `.env`:
+Đổi provider trong `services/chatbot-api/.env`:
 
 ```env
-# Azure OpenAI (hiện tại)
+# Azure OpenAI (mặc định)
 LLM_PROVIDER=azure
 AZURE_OPENAI_ENDPOINT=...
 AZURE_OPENAI_CHAT_DEPLOYMENT=...
@@ -305,27 +278,7 @@ OPENAI_BASE_URL=http://localhost:11434/v1
 LLM_MODEL=qwen2.5:7b
 ```
 
-### Đổi embeddings sang Azure
-```env
-EMBEDDING_PROVIDER=azure
-AZURE_OPENAI_EMBED_DEPLOYMENT=<tên-deployment-embedding>
-```
-*(cần tạo deployment embedding trên Azure portal trước)*
-
-### Thêm tool Function Calling mới
-1. Tạo file `app/tools/your_tool.py`:
-```python
-from langchain_core.tools import tool
-from app.tenancy import TenantContext
-
-def make_your_tools(tenant: TenantContext):
-    @tool
-    def do_something(param: str) -> str:
-        """Mô tả tool này (LLM đọc docstring để biết khi nào gọi)."""
-        return "kết quả"
-    return [do_something]
-```
-2. Đăng ký trong [app/tools/__init__.py](app/tools/__init__.py) — thêm vào `build_tools()`.
+Thêm tool Function Calling mới: tạo `app/tools/your_tool.py` rồi đăng ký trong [`app/tools/__init__.py`](services/chatbot-api/app/tools/__init__.py).
 
 ---
 
@@ -333,27 +286,25 @@ def make_your_tools(tenant: TenantContext):
 
 | Triệu chứng | Nguyên nhân & fix |
 |---|---|
-| `DeploymentNotFound 404` | Sai `AZURE_OPENAI_CHAT_DEPLOYMENT`. Kiểm tra Azure portal → Deployments. |
-| Lần đầu chạy treo lâu | Đang tải HF embedding model (~80MB). Đợi 1-2 phút. |
-| `ImportError: AgentExecutor` | LangChain 1.2 đã đổi API. Code đã dùng `create_agent` mới — đảm bảo cài đúng `requirements.txt`. |
-| Bot trả lời sai sản phẩm | Re-seed: xoá `data/<tenant>/vector/` rồi chạy lại `python seed_data.py`. |
-| `ModuleNotFoundError: app.tools.booking` | File bị thiếu — clone lại repo hoặc tạo lại từ template. |
+| `DeploymentNotFound 404` | Sai `AZURE_OPENAI_CHAT_DEPLOYMENT`. Check Azure portal → Deployments. |
+| Lần đầu chạy treo lâu | Đang tải HF embedding model (~80MB) / load model. Đợi 30–60s. |
+| `TELEGRAM_BOT_TOKEN is empty` | Chưa điền token trong `services/chatbot-api/.env`. |
+| client-server trả `401` | Thiếu/sai header `X-API-Key` (phải khớp `INTERNAL_API_KEY`). |
+| Port bị chiếm | Đổi port: chatbot-api sửa `run.py`; client-server đổi `PORT` trong `.env`. |
+| `Tenant 'xxx' is not registered` | Chạy lại `python seed_data.py` trong `services/chatbot-api/`. |
+
+Chi tiết hơn (MongoDB, migrate, từng bước) xem **[RUN.md](RUN.md)**.
 
 ---
 
-## 12. Triển khai production
-
-Theo SRS, target là **AWS multi-tenant**. Lộ trình gợi ý:
+## 12. Triển khai production (gợi ý theo SRS)
 
 | Layer | Dev (hiện tại) | Production gợi ý |
 |---|---|---|
 | LLM | Azure OpenAI | Azure OpenAI / AWS Bedrock |
 | Vector DB | FAISS local | Qdrant Cloud / OpenSearch |
-| NoSQL | TinyDB | DynamoDB / MongoDB Atlas |
+| NoSQL | TinyDB / MongoDB local | DynamoDB / MongoDB Atlas |
 | Embeddings | HF local | Bedrock Titan / Azure embeddings |
 | Server | uvicorn 1 worker | uvicorn + gunicorn, ECS Fargate / EKS |
 | Storage `data/` | local filesystem | S3 (vector index) + EFS |
 | Secrets | `.env` | AWS Secrets Manager |
-| CDN UI | – | CloudFront + S3 |
-
-Bước tiếp tích hợp Zalo OA (giai đoạn 2): thêm route `POST /webhook/zalo` ở [app/api/server.py](app/api/server.py), parse payload Zalo, gọi `agent.chat(...)`, post reply bằng Zalo Send API.
