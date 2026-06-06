@@ -1,0 +1,26 @@
+[
+  {
+    "id": "BTY-SR01",
+    "name": "Serum Vitamin C 20ml",
+    "price": 480000,
+    "stock": 25
+  },
+  {
+    "id": "BTY-CR02",
+    "name": "Kem chống nắng SPF50 PA++++ 50ml",
+    "price": 320000,
+    "stock": 0
+  },
+  {
+    "id": "BTY-MK03",
+    "name": "Son lì Velvet Matte #03 Đỏ Đất",
+    "price": 290000,
+    "stock": 18
+  },
+  {
+    "id": "BTY-CL04",
+    "name": "Sữa rửa mặt dịu nhẹ pH 5.5 150ml",
+    "price": 195000,
+    "stock": 60
+  }
+]

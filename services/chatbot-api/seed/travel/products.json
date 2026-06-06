@@ -1,0 +1,29 @@
+[
+  {
+    "sku": "TRV-DN3N",
+    "name": "Tour Đà Nẵng - Hội An 3N2Đ",
+    "description": "Khám phá Bà Nà Hills, phố cổ Hội An, đêm Sông Hàn. Khách sạn 4 sao, xe đưa đón, hướng dẫn viên tiếng Việt.",
+    "category": "tour-nội-địa",
+    "tags": ["đà nẵng", "hội an", "miền trung", "3n2đ", "gia đình"],
+    "price": 3500000,
+    "tour_code": "DN3N2D"
+  },
+  {
+    "sku": "TRV-PQ4N",
+    "name": "Tour Phú Quốc 4N3Đ Nghỉ Dưỡng",
+    "description": "Combo nghỉ dưỡng tại resort 5 sao Phú Quốc, vé máy bay khứ hồi, lặn ngắm san hô Hòn Thơm.",
+    "category": "tour-nội-địa",
+    "tags": ["phú quốc", "biển đảo", "nghỉ dưỡng", "5 sao", "honeymoon"],
+    "price": 5200000,
+    "tour_code": "PQ4N3D"
+  },
+  {
+    "sku": "TRV-HN2N",
+    "name": "Tour Hà Nội - Ninh Bình 2N1Đ",
+    "description": "Tham quan Tràng An, Tam Cốc, phố cổ Hà Nội. Khởi hành cuối tuần.",
+    "category": "tour-nội-địa",
+    "tags": ["hà nội", "ninh bình", "tràng an", "2n1đ", "cuối tuần"],
+    "price": 1800000,
+    "tour_code": "HN2N1D"
+  }
+]

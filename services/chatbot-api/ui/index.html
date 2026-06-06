@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SC Chatbot - Demo</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#1e293b; --bot:#334155; --user:#2563eb; --text:#e2e8f0; --muted:#94a3b8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+    header { padding: 12px 16px; background: var(--panel); display:flex; gap:12px; align-items:center; }
+    header h1 { margin: 0; font-size: 16px; }
+    header select, header input { background:#0b1220; color:var(--text); border:1px solid #334155;
+                                  padding:6px 10px; border-radius:6px; font-size:13px; }
+    #chat { flex: 1; overflow-y: auto; padding: 16px; display:flex; flex-direction:column; gap:8px; }
+    .msg { padding: 10px 12px; border-radius: 10px; max-width: 75%; white-space: pre-wrap; line-height:1.4; }
+    .user { align-self: flex-end; background: var(--user); }
+    .bot { align-self: flex-start; background: var(--bot); }
+    .meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    form { display:flex; gap:8px; padding: 12px; background: var(--panel); }
+    input[name=q] { flex: 1; padding: 10px 12px; border-radius: 8px; border:1px solid #334155;
+                    background:#0b1220; color: var(--text); font-size: 14px; }
+    button { padding: 10px 16px; border-radius: 8px; border: 0; background: var(--user);
+             color: white; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    .rate { display:flex; gap:4px; padding: 0 12px 12px; }
+    .rate button { background:#334155; padding:6px 10px; font-weight:400; font-size:12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SC Chatbot</h1>
+    <label>Tenant:
+      <select id="tenant"></select>
+    </label>
+    <label>Session:
+      <input id="session" value="" size="14" />
+    </label>
+    <button id="newSession" type="button" style="background:#334155;padding:6px 10px;font-size:12px;font-weight:400;">+ Session mới</button>
+  </header>
+
+  <div id="chat"></div>
+
+  <div class="rate" id="rate" style="display:none">
+    <span style="font-size:12px;color:var(--muted);align-self:center;margin-right:8px;">Đánh giá cuộc trò chuyện:</span>
+    <button data-s="1">1</button><button data-s="2">2</button>
+    <button data-s="3">3</button><button data-s="4">4</button>
+    <button data-s="5">5</button>
+  </div>
+
+  <form id="form">
+    <input name="q" autocomplete="off" placeholder="Nhập tin nhắn... (vd: tôi muốn đặt tour Đà Nẵng cho 2 người ngày 2026-06-15)" />
+    <button>Gửi</button>
+  </form>
+
+<script>
+const chatEl = document.getElementById("chat");
+const form = document.getElementById("form");
+const tenantSel = document.getElementById("tenant");
+const sessionInput = document.getElementById("session");
+const rateBar = document.getElementById("rate");
+
+function newSession() {
+  sessionInput.value = "s-" + Math.random().toString(36).slice(2, 8);
+  chatEl.innerHTML = "";
+  rateBar.style.display = "none";
+}
+newSession();
+document.getElementById("newSession").onclick = newSession;
+
+async function loadTenants() {
+  const r = await fetch("/tenants").then(r => r.json());
+  tenantSel.innerHTML = "";
+  for (const t of r.tenants) {
+    const o = document.createElement("option");
+    o.value = t.tenant_id; o.textContent = `${t.name} [${t.tenant_id}]`;
+    tenantSel.appendChild(o);
+  }
+}
+loadTenants();
+
+function append(text, role, meta) {
+  const d = document.createElement("div");
+  d.className = "msg " + (role === "user" ? "user" : "bot");
+  d.textContent = text;
+  if (meta) {
+    const m = document.createElement("div");
+    m.className = "meta"; m.textContent = meta;
+    d.appendChild(m);
+  }
+  chatEl.appendChild(d);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+form.onsubmit = async (e) => {
+  e.preventDefault();
+  const input = form.q;
+  const msg = input.value.trim();
+  if (!msg) return;
+  append(msg, "user");
+  input.value = "";
+  form.querySelector("button").disabled = true;
+  try {
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenant_id: tenantSel.value,
+        session_id: sessionInput.value,
+        message: msg,
+      }),
+    }).then(r => r.json());
+    append(res.reply || "(trống)", "bot", `${res.latency_ms} ms`);
+    rateBar.style.display = "flex";
+  } catch (err) {
+    append("Lỗi: " + err.message, "bot");
+  } finally {
+    form.querySelector("button").disabled = false;
+    input.focus();
+  }
+};
+
+rateBar.onclick = async (e) => {
+  if (e.target.tagName !== "BUTTON") return;
+  const score = +e.target.dataset.s;
+  await fetch("/csat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tenant_id: tenantSel.value,
+      session_id: sessionInput.value,
+      score,
+    }),
+  });
+  append(`Cảm ơn bạn đã đánh giá ${score}/5 ⭐`, "bot");
+  rateBar.style.display = "none";
+};
+</script>
+</body>
+</html>

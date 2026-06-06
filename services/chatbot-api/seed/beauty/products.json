@@ -1,0 +1,37 @@
+[
+  {
+    "sku": "BTY-SR01",
+    "name": "Serum Vitamin C 20ml",
+    "description": "Serum dưỡng sáng da với Vitamin C 15% và Hyaluronic Acid. Thẩm thấu nhanh, giúp làm mờ thâm nám và đều màu da sau 4 tuần sử dụng.",
+    "category": "skincare",
+    "tags": ["dưỡng sáng", "thâm nám", "vitamin c", "serum", "da khô", "da hỗn hợp"],
+    "price": 480000,
+    "contraindication": "Không dùng cho da đang kích ứng / mới peel.",
+    "usage": "Dùng buổi tối, 2-3 giọt sau bước toner."
+  },
+  {
+    "sku": "BTY-CR02",
+    "name": "Kem chống nắng SPF50 PA++++ 50ml",
+    "description": "Kem chống nắng phổ rộng, kết cấu mỏng nhẹ, không gây bóng dầu, phù hợp cho da dầu mụn và da nhạy cảm.",
+    "category": "skincare",
+    "tags": ["chống nắng", "da dầu", "da mụn", "spf50"],
+    "price": 320000,
+    "usage": "Thoa lượng vừa đủ trước khi ra ngoài 15-20 phút."
+  },
+  {
+    "sku": "BTY-MK03",
+    "name": "Son lì Velvet Matte #03 Đỏ Đất",
+    "description": "Son lì lâu trôi 8 tiếng, lên màu chuẩn, không gây khô môi. Tone đỏ đất ấm phù hợp da vàng.",
+    "category": "makeup",
+    "tags": ["son lì", "đỏ đất", "lâu trôi", "tone ấm"],
+    "price": 290000
+  },
+  {
+    "sku": "BTY-CL04",
+    "name": "Sữa rửa mặt dịu nhẹ pH 5.5 150ml",
+    "description": "Sữa rửa mặt không xà phòng, sạch sâu nhưng giữ ẩm. Thành phần Centella & Panthenol.",
+    "category": "skincare",
+    "tags": ["rửa mặt", "da nhạy cảm", "da khô", "ph 5.5"],
+    "price": 195000
+  }
+]

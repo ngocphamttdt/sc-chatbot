@@ -1,0 +1,26 @@
+[
+  {
+    "id": "s01",
+    "name": "Chăm sóc da mặt cơ bản",
+    "price": 350000,
+    "duration_min": 60
+  },
+  {
+    "id": "s02",
+    "name": "Trị mụn chuyên sâu",
+    "price": 550000,
+    "duration_min": 90
+  },
+  {
+    "id": "s03",
+    "name": "Massage body thư giãn",
+    "price": 450000,
+    "duration_min": 75
+  },
+  {
+    "id": "s04",
+    "name": "Tắm trắng toàn thân",
+    "price": 700000,
+    "duration_min": 120
+  }
+]
