@@ -84,6 +84,8 @@ fi
 
 # --- 5. start services -----------------------------------------------------
 mkdir -p "$LOGS"
+PID_FILE="$LOGS/run.pids"
+: > "$PID_FILE"   # reset file PID
 pids=()
 names=()
 
@@ -92,9 +94,11 @@ start() {
   local dir="$1"; shift
   echo "==> Start $name ..."
   ( cd "$dir" && exec "$@" ) >"$LOGS/$name.log" 2>&1 &
-  pids+=("$!")
+  local pid=$!
+  pids+=("$pid")
   names+=("$name")
-  echo "    $name (PID $!) -> logs/$name.log"
+  echo "$pid $name" >> "$PID_FILE"
+  echo "    $name (PID $pid) -> logs/$name.log"
 }
 
 cleanup() {
@@ -103,6 +107,7 @@ cleanup() {
   for pid in "${pids[@]}"; do
     kill "$pid" 2>/dev/null || true
   done
+  rm -f "$PID_FILE"
   wait 2>/dev/null || true
   exit 0
 }
@@ -121,5 +126,5 @@ echo "  web-admin    : http://localhost:5173"
 echo "  Telegram     : worker đang polling (xem logs/telegram-worker.log)"
 echo ""
 echo "Log realtime:  tail -f logs/<service>.log"
-echo "Nhấn Ctrl+C để dừng tất cả."
+echo "Dừng tất cả:   nhấn Ctrl+C (hoặc chạy ./stop.sh ở terminal khác)."
 wait
