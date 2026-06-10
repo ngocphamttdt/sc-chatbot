@@ -48,6 +48,21 @@ export type ConversationMessage = {
   ts: number;
 };
 
+export type DependsOn = {
+  key: string;
+  value: string;
+};
+
+export type Setting = {
+  key: string;
+  value: string;
+  scope: string;
+  description: string;
+  is_secret: boolean;
+  updated_at: number;
+  depends_on?: DependsOn;
+};
+
 export type Stats = {
   total_conversations: number;
   total_messages_in: number;

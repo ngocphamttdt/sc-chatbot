@@ -1,0 +1,104 @@
+services:
+
+  client-server:
+    build: ./services/client-server
+    ports:
+      - "${CLIENT_SERVER_PORT:-8001}:8001"
+    env_file: ./services/client-server/.env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  chatbot-api:
+    build: ./services/chatbot-api
+    ports:
+      - "${CHATBOT_API_PORT:-8000}:8000"
+    env_file: ./services/chatbot-api/.env
+    environment:
+      CLIENT_SERVER_URL: http://client-server:8001
+      MONGO_URI: mongodb://mongo:27017/scchatbot
+    volumes:
+      - chatbot-data:/app/data
+    depends_on:
+      client-server:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  telegram-worker:
+    build: ./services/chatbot-api
+    command: python telegram_worker.py
+    env_file: ./services/chatbot-api/.env
+    environment:
+      CLIENT_SERVER_URL: http://client-server:8001
+      MONGO_URI: mongodb://mongo:27017/scchatbot
+    volumes:
+      - chatbot-data:/app/data
+    depends_on:
+      client-server:
+        condition: service_healthy
+      chatbot-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web-admin:
+    build:
+      context: ./services/web-admin
+      args:
+        VITE_API_BASE_URL: "${VITE_API_BASE_URL:-http://localhost:8000}"
+    ports:
+      - "${WEB_ADMIN_PORT:-5173}:80"
+    depends_on:
+      chatbot-api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  seed:
+    build: ./services/chatbot-api
+    command: python seed_data.py
+    env_file: ./services/chatbot-api/.env
+    environment:
+      CLIENT_SERVER_URL: http://client-server:8001
+    volumes:
+      - chatbot-data:/app/data
+    depends_on:
+      client-server:
+        condition: service_healthy
+    profiles:
+      - seed
+    restart: "no"
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    profiles:
+      - mongo
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  chatbot-data:
+  mongo-data:

@@ -1,6 +1,7 @@
 """FastAPI app - HTTP surface for the chatbot (Zalo OA layer omitted per scope)."""
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -17,11 +18,19 @@ from app.api.schemas import (
     IngestResponse,
     TenantCreateRequest,
 )
+from app.config import init_settings
 from app.core import agent, analytics, memory
 from app.knowledge import ingest
 from app.tenancy import get_tenant, list_tenants, register_tenant
 
-app = FastAPI(title="SC Chatbot", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_settings()
+    yield
+
+
+app = FastAPI(title="SC Chatbot", version="0.1.0", lifespan=lifespan)
 app.include_router(admin_router)
 
 app.add_middleware(

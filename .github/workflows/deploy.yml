@@ -1,0 +1,59 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, ci-cd-workflow]
+  workflow_dispatch:
+
+env:
+  DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/sc-chatbot' }}
+  WEB_ADMIN_PORT: ${{ secrets.WEB_ADMIN_PORT || '30001' }}
+  CHATBOT_API_PORT: ${{ secrets.CHATBOT_API_PORT || '30002' }}
+  CLIENT_SERVER_PORT: ${{ secrets.CLIENT_SERVER_PORT || '30003' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: SSH and deploy
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            echo "--- Pull latest code ---"
+            cd ${{ env.DEPLOY_PATH }}
+            git pull origin ${{ github.ref_name }}
+
+            echo "--- Write .env with port overrides ---"
+            cat > .env <<EOF
+            WEB_ADMIN_PORT=${{ env.WEB_ADMIN_PORT }}
+            CHATBOT_API_PORT=${{ env.CHATBOT_API_PORT }}
+            CLIENT_SERVER_PORT=${{ env.CLIENT_SERVER_PORT }}
+            VITE_API_BASE_URL=http://${{ secrets.SSH_HOST }}:${{ env.CHATBOT_API_PORT }}
+            EOF
+
+            echo "--- Rebuild and start services ---"
+            docker compose --profile seed up --build -d
+
+            echo "--- Health check ---"
+            for i in $(seq 1 12); do
+              if curl -sf http://localhost:${{ env.CHATBOT_API_PORT }}/health > /dev/null 2>&1; then
+                echo "Health check passed"
+                break
+              fi
+              echo "Waiting for chatbot-api (attempt $i/12)..."
+              sleep 5
+            done
+
+            echo "--- Prune old images ---"
+            docker image prune -af --filter "until=24h"
+
+            echo "--- Deploy complete ---"
