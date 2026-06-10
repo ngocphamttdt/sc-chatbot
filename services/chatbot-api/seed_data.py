@@ -18,8 +18,9 @@ ROOT = Path(__file__).parent / "seed"
 
 def _load_products(tenant, products_file: Path) -> int:
     data = json.loads(products_file.read_text(encoding="utf-8"))
+    db_path = Path(tenant.products_db)
+    db_path.unlink(missing_ok=True)
     with TinyDB(tenant.products_db) as db:
-        db.truncate()
         db.insert_multiple(data)
     return len(data)
 
