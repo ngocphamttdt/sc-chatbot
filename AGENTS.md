@@ -58,7 +58,45 @@ docker compose --profile seed --profile mongo up --build -d  # MongoDB + seed
 - **Auth**: `INTERNAL_API_KEY` shared between chatbot-api ↔ client-server (header `X-API-Key`); `JWT_SECRET` + `ADMIN_USER`/`ADMIN_PASSWORD` for web-admin login
 - **Telegram**: `TELEGRAM_BOT_TOKEN` required for Telegram worker
 
-## No tests, no linter, no typecheck, no CI/CD
+## CI/CD — GitHub Actions deploy
+
+A deploy workflow (`.github/workflows/deploy.yml`) auto-deploys on push to `main` or `ci-cd-workflow`.
+
+### Required GitHub Secrets
+
+| Secret | Description |
+|---|---|
+| `SSH_HOST` | Target host IP or domain |
+| `SSH_PORT` | SSH port (default `22`) |
+| `SSH_USER` | SSH login user |
+| `SSH_PRIVATE_KEY` | SSH private key in PEM format |
+| `DEPLOY_PATH` | Absolute path to the project directory on the host (default `/opt/sc-chatbot`) |
+
+Optional secrets for port remapping (defaults in parentheses):
+- `WEB_ADMIN_PORT` (`30001`), `CHATBOT_API_PORT` (`30002`), `CLIENT_SERVER_PORT` (`30003`)
+
+### Initial host setup (one-time)
+
+```bash
+ssh <user>@<host>
+git clone https://github.com/ngocphamttdt/sc-chatbot.git /opt/sc-chatbot
+cd /opt/sc-chatbot
+cp services/chatbot-api/.env.example services/chatbot-api/.env
+cp services/client-server/.env.example services/client-server/.env
+cp services/web-admin/.env.example services/web-admin/.env
+# edit .env files with production values
+```
+
+### Deploy flow
+
+1. Push to `main` triggers the workflow.
+2. Workflow SSHes into the host and runs `git pull`.
+3. Writes `.env` with port overrides from secrets.
+4. Runs `docker compose --profile seed up --build -d`.
+5. Health-checks `chatbot-api` (retries up to 60s).
+6. Prunes Docker images older than 24h.
+
+## No tests, no linter, no typecheck
 - Zero test files or test runner config anywhere in repo.
 - No ruff/mypy/ESLint config files.
 - Dockerfiles exist per service in `services/*/Dockerfile`; `docker-compose.yml` at root.
