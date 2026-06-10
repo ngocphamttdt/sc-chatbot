@@ -6,12 +6,14 @@ import {
   DocsIcon,
   LogoIcon,
   PromptIcon,
+  SettingsIcon,
 } from "./Icons";
 
 const NAV = [
   { to: "/stats", label: "Dashboard", icon: DashboardIcon },
   { to: "/documents", label: "Knowledge base", icon: DocsIcon },
   { to: "/prompt", label: "System prompt", icon: PromptIcon },
+  { to: "/settings", label: "Cấu hình", icon: SettingsIcon },
   { to: "/conversations", label: "Hội thoại", icon: ChatIcon },
 ];
 

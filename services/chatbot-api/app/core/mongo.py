@@ -58,3 +58,10 @@ def messages() -> Collection:
 def conversations() -> Collection:
     _ensure_indexes()
     return get_db().conversations
+
+
+def settings() -> Collection:
+    _ensure_indexes()
+    col = get_db().settings
+    col.create_index([("key", ASCENDING), ("scope", ASCENDING)], unique=True)
+    return col

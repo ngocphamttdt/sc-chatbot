@@ -66,6 +66,10 @@ def _tenants_registry() -> Path:
     return settings.data_dir / "tenants.json"
 
 
+def global_settings_db() -> Path:
+    return settings.data_dir / "global_settings.json"
+
+
 def register_tenant(tenant_id: str, name: str, industry: str) -> TenantContext:
     """Create / update a tenant entry and ensure its folder exists."""
     reg_path = _tenants_registry()

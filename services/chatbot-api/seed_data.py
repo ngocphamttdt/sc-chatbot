@@ -1,5 +1,7 @@
 """Bootstrap two demo tenants and load their products + FAQ into the system.
 
+Also seeds default settings from env / defaults into the DB.
+
 Run once after `pip install -r requirements.txt`:
     python seed_data.py
 """
@@ -10,7 +12,9 @@ from pathlib import Path
 
 from tinydb import TinyDB
 
+from app.config import SETTING_METADATA, settings
 from app.knowledge import ingest
+from app.settings_repository import create_repository
 from app.tenancy import register_tenant
 
 ROOT = Path(__file__).parent / "seed"
@@ -53,7 +57,25 @@ def _seed_one(tenant_id: str, name: str, industry: str, folder: str) -> dict:
     return {"tenant_id": tenant_id, "products": n_prod, "kb_chunks": n_chunks}
 
 
+def _seed_settings():
+    """Write default settings from env / defaults into the DB."""
+    repo = create_repository(
+        settings.storage_backend,
+        data_dir=settings.data_dir,
+        mongo_uri=settings.mongo_uri,
+    )
+    existing = repo.list(scope="global")
+    if existing:
+        print(f"[settings] already seeded ({len(existing)} keys), skipping")
+        return
+    for key, meta in SETTING_METADATA.items():
+        val = getattr(settings, key)
+        repo.set(key, str(val), scope="global", description=meta["description"], is_secret=meta["is_secret"])
+    print(f"[settings] seeded {len(SETTING_METADATA)} keys into DB")
+
+
 def main():
+    _seed_settings()
     results = [
         _seed_one("demo-beauty", "Mỹ phẩm Glow", "beauty", "beauty"),
         _seed_one("demo-travel", "Du lịch SaoMai", "travel", "travel"),

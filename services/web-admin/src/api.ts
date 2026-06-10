@@ -3,6 +3,7 @@ import type {
   ConversationsPage,
   Document,
   PromptConfig,
+  Setting,
   Stats,
   Tenant,
 } from "./types";
@@ -127,5 +128,35 @@ export const getConversation = (tenantId: string, sessionId: string) =>
 // --- Stats -----------------------------------------------------------
 
 export const getStats = () => request<Stats>("/admin/stats");
+
+// --- Settings ---------------------------------------------------------
+
+export const listSettings = (scope?: string) => {
+  const params = scope ? `?scope=${encodeURIComponent(scope)}` : "";
+  return request<Setting[]>(`/admin/settings${params}`);
+};
+
+export const getSetting = (key: string, scope = "global") =>
+  request<Setting>(`/admin/settings/${encodeURIComponent(key)}?scope=${encodeURIComponent(scope)}`);
+
+export const updateSetting = (key: string, value: string, scope = "global") =>
+  request<Setting>(`/admin/settings/${encodeURIComponent(key)}`, {
+    method: "PUT",
+    body: JSON.stringify({ value, scope }),
+  });
+
+export const revealSetting = (key: string, scope = "global") =>
+  request<{ key: string; value: string }>(
+    `/admin/settings/${encodeURIComponent(key)}/reveal?scope=${encodeURIComponent(scope)}`
+  );
+
+export const deleteSetting = (key: string, scope = "global") =>
+  request<{ ok: boolean }>(
+    `/admin/settings/${encodeURIComponent(key)}?scope=${encodeURIComponent(scope)}`,
+    { method: "DELETE" }
+  );
+
+export const reloadSettings = () =>
+  request<{ ok: boolean; reloaded_at: number }>("/admin/settings/reload", { method: "POST" });
 
 export { ApiError };
