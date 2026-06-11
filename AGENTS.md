@@ -71,6 +71,7 @@ A deploy workflow (`.github/workflows/deploy.yml`) auto-deploys on push to `main
 | `SSH_USER` | SSH login user |
 | `SSH_PRIVATE_KEY` | SSH private key in PEM format |
 | `DEPLOY_PATH` | Absolute path to the project directory on the host (default `/opt/sc-chatbot`) |
+| `GH_PAT` | GitHub Personal Access Token with repo scope (for private repo pulls) |
 
 Optional secrets for port remapping (defaults in parentheses):
 - `WEB_ADMIN_PORT` (`30001`), `CHATBOT_API_PORT` (`30002`), `CLIENT_SERVER_PORT` (`30003`)

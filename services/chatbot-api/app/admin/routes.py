@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from app.admin import aggregations, auth, configs, documents, settings as settings_router
 from app.tenancy import get_tenant
 
-router = APIRouter(prefix="/admin")
+router = APIRouter(prefix="/api")
 router.include_router(settings_router.router)
 
 

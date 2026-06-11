@@ -25,19 +25,34 @@ jobs:
           port: ${{ secrets.SSH_PORT || '22' }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 30m
           script: |
             set -e
 
             echo "--- Pull latest code ---"
             cd ${{ env.DEPLOY_PATH }}
-            git pull origin ${{ github.ref_name }}
+            git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/ngocphamttdt/sc-chatbot.git
+            if [ ! -d "${{ env.DEPLOY_PATH }}/.git" ]; then
+              git clone https://x-access-token:${{ secrets.GH_PAT }}@github.com/ngocphamttdt/sc-chatbot.git .
+            else
+              git fetch origin
+            fi
+
+            git reset --hard origin/${{ github.ref_name }}
+
+            echo "--- Ensure per-service .env files exist ---"
+            for f in services/chatbot-api/.env services/client-server/.env; do
+              if [ ! -f "$f" ]; then
+                cp "${f}.example" "$f"
+                echo "Created $f from template"
+              fi
+            done
 
             echo "--- Write .env with port overrides ---"
             cat > .env <<EOF
             WEB_ADMIN_PORT=${{ env.WEB_ADMIN_PORT }}
             CHATBOT_API_PORT=${{ env.CHATBOT_API_PORT }}
             CLIENT_SERVER_PORT=${{ env.CLIENT_SERVER_PORT }}
-            VITE_API_BASE_URL=http://${{ secrets.SSH_HOST }}:${{ env.CHATBOT_API_PORT }}
             EOF
 
             echo "--- Rebuild and start services ---"

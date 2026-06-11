@@ -8,7 +8,7 @@ import type {
   Tenant,
 } from "./types";
 
-const BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 const TOKEN_KEY = "sc_admin_token";
 
@@ -68,7 +68,7 @@ async function request<T>(
 
 export async function login(username: string, password: string): Promise<string> {
   const r = await request<{ token: string }>(
-    "/admin/login",
+    "/login",
     { method: "POST", body: JSON.stringify({ username, password }) },
     { auth: false }
   );
@@ -77,33 +77,33 @@ export async function login(username: string, password: string): Promise<string>
 
 // --- Tenants ---------------------------------------------------------
 
-export const listTenants = () => request<Tenant[]>("/admin/tenants");
+export const listTenants = () => request<Tenant[]>("/tenants");
 
 // --- Documents ------------------------------------------------------
 
 export const listDocuments = (tenantId: string) =>
-  request<Document[]>(`/admin/documents?tenant_id=${encodeURIComponent(tenantId)}`);
+  request<Document[]>(`/documents?tenant_id=${encodeURIComponent(tenantId)}`);
 
 export async function uploadDocument(tenantId: string, file: File): Promise<Document> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("tenant_id", tenantId);
-  return request<Document>("/admin/documents", { method: "POST", body: fd });
+  return request<Document>("/documents", { method: "POST", body: fd });
 }
 
 export const deleteDocument = (tenantId: string, docId: string) =>
   request<{ ok: boolean }>(
-    `/admin/documents/${encodeURIComponent(docId)}?tenant_id=${encodeURIComponent(tenantId)}`,
+    `/documents/${encodeURIComponent(docId)}?tenant_id=${encodeURIComponent(tenantId)}`,
     { method: "DELETE" }
   );
 
 // --- Prompt config ---------------------------------------------------
 
 export const getPrompt = (tenantId: string) =>
-  request<PromptConfig>(`/admin/config/prompt?tenant_id=${encodeURIComponent(tenantId)}`);
+  request<PromptConfig>(`/config/prompt?tenant_id=${encodeURIComponent(tenantId)}`);
 
 export const putPrompt = (tenantId: string, systemPrompt: string) =>
-  request<{ ok: boolean }>("/admin/config/prompt", {
+  request<{ ok: boolean }>("/config/prompt", {
     method: "PUT",
     body: JSON.stringify({ tenant_id: tenantId, system_prompt: systemPrompt }),
   });
@@ -117,17 +117,47 @@ export function listConversations(
 ): Promise<ConversationsPage> {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   if (tenantId) params.set("tenant_id", tenantId);
-  return request<ConversationsPage>(`/admin/conversations?${params.toString()}`);
+  return request<ConversationsPage>(`/conversations?${params.toString()}`);
 }
 
 export const getConversation = (tenantId: string, sessionId: string) =>
   request<{ session_id: string; tenant_id: string; messages: ConversationMessage[] }>(
-    `/admin/conversations/${encodeURIComponent(sessionId)}?tenant_id=${encodeURIComponent(tenantId)}`
+    `/conversations/${encodeURIComponent(sessionId)}?tenant_id=${encodeURIComponent(tenantId)}`
   );
 
 // --- Stats -----------------------------------------------------------
 
-export const getStats = () => request<Stats>("/admin/stats");
+export const getStats = () => request<Stats>("/stats");
+
+// --- Settings ---------------------------------------------------------
+
+export const listSettings = (scope?: string) => {
+  const params = scope ? `?scope=${encodeURIComponent(scope)}` : "";
+  return request<Setting[]>(`/settings${params}`);
+};
+
+export const getSetting = (key: string, scope = "global") =>
+  request<Setting>(`/settings/${encodeURIComponent(key)}?scope=${encodeURIComponent(scope)}`);
+
+export const updateSetting = (key: string, value: string, scope = "global") =>
+  request<Setting>(`/settings/${encodeURIComponent(key)}`, {
+    method: "PUT",
+    body: JSON.stringify({ value, scope }),
+  });
+
+export const revealSetting = (key: string, scope = "global") =>
+  request<{ key: string; value: string }>(
+    `/settings/${encodeURIComponent(key)}/reveal?scope=${encodeURIComponent(scope)}`
+  );
+
+export const deleteSetting = (key: string, scope = "global") =>
+  request<{ ok: boolean }>(
+    `/settings/${encodeURIComponent(key)}?scope=${encodeURIComponent(scope)}`,
+    { method: "DELETE" }
+  );
+
+export const reloadSettings = () =>
+  request<{ ok: boolean; reloaded_at: number }>("/settings/reload", { method: "POST" });
 
 // --- Settings ---------------------------------------------------------
 
