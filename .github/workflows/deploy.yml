@@ -1,8 +1,6 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main, ci-cd-workflow]
   workflow_dispatch:
 
 env:
