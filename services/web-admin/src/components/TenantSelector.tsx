@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listTenants } from "../api";
+import { useAuth } from "../auth";
 import type { Tenant } from "../types";
 
 type Props = {
@@ -9,17 +10,33 @@ type Props = {
 };
 
 export default function TenantSelector({ value, onChange, allowAll }: Props) {
+  const { isAdmin, tenantId: authTenantId } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isAdmin) {
+      // Tenant users: auto-set to their own tenant, no API call needed
+      if (authTenantId && !value) onChange(authTenantId);
+      return;
+    }
     listTenants()
       .then((t) => {
         setTenants(t);
         if (!value && t.length > 0 && !allowAll) onChange(t[0].tenant_id);
       })
       .catch((e) => setError(String(e.message || e)));
-  }, []);
+  }, [isAdmin, authTenantId]);
+
+  // Tenant users: show their tenant as read-only, no dropdown
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-slate-500">Tenant:</span>
+        <span className="text-sm font-medium text-slate-700">{authTenantId ?? "—"}</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2">

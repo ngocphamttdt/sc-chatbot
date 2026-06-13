@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import time
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
@@ -42,7 +44,7 @@ def _mask(row: dict) -> dict:
 
 @router.get("")
 def list_settings(
-    scope: str | None = Query(default=None),
+    scope: Optional[str] = Query(default=None),
     _: str = Depends(require_admin),
 ):
     repo = _repo()

@@ -1,14 +1,22 @@
 import type {
+  AdminUser,
   ConversationMessage,
   ConversationsPage,
   Document,
+  LoginResponse,
   PromptConfig,
-  Setting,
+  PromptEntry,
+  Role,
+  RoleColor,
+  Permission,
   Stats,
   Tenant,
+  TenantUser,
+  Setting,
 } from "./types";
+import { hashPassword } from "./crypto";
 
-const BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+const BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 const TOKEN_KEY = "sc_admin_token";
 
@@ -45,11 +53,8 @@ async function request<T>(
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     let body: unknown = null;
-    try {
-      body = await res.json();
-    } catch {
-      body = await res.text();
-    }
+    const rawText = await res.text();
+    try { body = JSON.parse(rawText); } catch { body = rawText; }
     const detail =
       typeof body === "object" && body && "detail" in body
         ? (body as { detail: unknown }).detail
@@ -66,98 +71,165 @@ async function request<T>(
 
 // --- Auth ------------------------------------------------------------
 
-export async function login(username: string, password: string): Promise<string> {
-  const r = await request<{ token: string }>(
-    "/login",
-    { method: "POST", body: JSON.stringify({ username, password }) },
+export async function login(username: string, password: string): Promise<LoginResponse> {
+  return request<LoginResponse>(
+    "/admin/login",
+    { method: "POST", body: JSON.stringify({ username, password: await hashPassword(password) }) },
     { auth: false }
   );
-  return r.token;
 }
 
 // --- Tenants ---------------------------------------------------------
 
-export const listTenants = () => request<Tenant[]>("/tenants");
+export const listTenants = () =>
+  request<{ tenants: Tenant[] }>("/tenants").then((r) => r.tenants);
 
-// --- Documents ------------------------------------------------------
+export const createTenant = (tenant_id: string, name: string, industry: string) =>
+  request<Tenant>("/tenants", {
+    method: "POST",
+    body: JSON.stringify({ tenant_id, name, industry }),
+  }, { auth: false });
+
+// --- Admin users -----------------------------------------------------
+
+export const listAdminUsers = () =>
+  request<AdminUser[]>("/admin/users");
+
+export const createAdminUser = async (email: string, password: string, role: string) =>
+  request<AdminUser>("/admin/users", {
+    method: "POST",
+    body: JSON.stringify({ email, password: await hashPassword(password), role }),
+  });
+
+export const deleteAdminUser = (userId: string) =>
+  request<void>(`/admin/users/${encodeURIComponent(userId)}`, { method: "DELETE" });
+
+// --- Roles -----------------------------------------------------------
+
+export const listRoles = () =>
+  request<Role[]>("/admin/roles");
+
+export const createRole = (name: string, description: string, color: RoleColor, permissions: Permission[]) =>
+  request<Role>("/admin/roles", {
+    method: "POST",
+    body: JSON.stringify({ name, description, color, permissions }),
+  });
+
+export const updateRole = (
+  roleId: string,
+  patch: { name?: string; description?: string; color?: RoleColor; permissions?: Permission[] }
+) =>
+  request<Role>(`/admin/roles/${encodeURIComponent(roleId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+
+export const deleteRole = (roleId: string) =>
+  request<void>(`/admin/roles/${encodeURIComponent(roleId)}`, { method: "DELETE" });
+
+export const updateTenant = (tenantId: string, name: string, industry: string) =>
+  request<Tenant>(`/admin/tenants/${encodeURIComponent(tenantId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name, industry }),
+  });
+
+// --- Prompts ---------------------------------------------------------
+
+export const listPrompts = (tenantId: string) =>
+  request<PromptEntry[]>(`/admin/tenants/${encodeURIComponent(tenantId)}/prompts`);
+
+export const createPrompt = (tenantId: string, name: string, content: string) =>
+  request<PromptEntry>(`/admin/tenants/${encodeURIComponent(tenantId)}/prompts`, {
+    method: "POST",
+    body: JSON.stringify({ name, content }),
+  });
+
+export const updatePrompt = (tenantId: string, promptId: string, name: string, content: string) =>
+  request<PromptEntry>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/prompts/${encodeURIComponent(promptId)}`,
+    { method: "PATCH", body: JSON.stringify({ name, content }) }
+  );
+
+export const activatePrompt = (tenantId: string, promptId: string) =>
+  request<PromptEntry>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/prompts/${encodeURIComponent(promptId)}/activate`,
+    { method: "PUT" }
+  );
+
+export const deletePrompt = (tenantId: string, promptId: string) =>
+  request<void>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/prompts/${encodeURIComponent(promptId)}`,
+    { method: "DELETE" }
+  );
+
+// --- Tenant users ----------------------------------------------------
+
+export const listTenantUsers = (tenantId: string) =>
+  request<TenantUser[]>(`/admin/tenants/${encodeURIComponent(tenantId)}/users`);
+
+export const createTenantUser = async (tenantId: string, email: string, password: string, role: string) =>
+  request<TenantUser>(`/admin/tenants/${encodeURIComponent(tenantId)}/users`, {
+    method: "POST",
+    body: JSON.stringify({ email, password: await hashPassword(password), role }),
+  });
+
+export const updateTenantUserRole = (tenantId: string, userId: string, role: string) =>
+  request<TenantUser>(`/admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+
+export const deleteTenantUser = (tenantId: string, userId: string) =>
+  request<void>(
+    `/admin/tenants/${encodeURIComponent(tenantId)}/users/${encodeURIComponent(userId)}`,
+    { method: "DELETE" }
+  );
+
+// --- Documents -------------------------------------------------------
 
 export const listDocuments = (tenantId: string) =>
-  request<Document[]>(`/documents?tenant_id=${encodeURIComponent(tenantId)}`);
+  request<Document[]>(`/admin/documents?tenant_id=${encodeURIComponent(tenantId)}`);
 
 export async function uploadDocument(tenantId: string, file: File): Promise<Document> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("tenant_id", tenantId);
-  return request<Document>("/documents", { method: "POST", body: fd });
+  return request<Document>("/admin/documents", { method: "POST", body: fd });
 }
 
 export const deleteDocument = (tenantId: string, docId: string) =>
   request<{ ok: boolean }>(
-    `/documents/${encodeURIComponent(docId)}?tenant_id=${encodeURIComponent(tenantId)}`,
+    `/admin/documents/${encodeURIComponent(docId)}?tenant_id=${encodeURIComponent(tenantId)}`,
     { method: "DELETE" }
   );
 
 // --- Prompt config ---------------------------------------------------
 
 export const getPrompt = (tenantId: string) =>
-  request<PromptConfig>(`/config/prompt?tenant_id=${encodeURIComponent(tenantId)}`);
+  request<PromptConfig>(`/admin/config/prompt?tenant_id=${encodeURIComponent(tenantId)}`);
 
 export const putPrompt = (tenantId: string, systemPrompt: string) =>
-  request<{ ok: boolean }>("/config/prompt", {
+  request<{ ok: boolean }>("/admin/config/prompt", {
     method: "PUT",
     body: JSON.stringify({ tenant_id: tenantId, system_prompt: systemPrompt }),
   });
 
 // --- Conversations ---------------------------------------------------
 
-export function listConversations(
-  page: number,
-  size: number,
-  tenantId?: string | null
-): Promise<ConversationsPage> {
+export function listConversations(page: number, size: number, tenantId?: string | null): Promise<ConversationsPage> {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   if (tenantId) params.set("tenant_id", tenantId);
-  return request<ConversationsPage>(`/conversations?${params.toString()}`);
+  return request<ConversationsPage>(`/admin/conversations?${params.toString()}`);
 }
 
 export const getConversation = (tenantId: string, sessionId: string) =>
   request<{ session_id: string; tenant_id: string; messages: ConversationMessage[] }>(
-    `/conversations/${encodeURIComponent(sessionId)}?tenant_id=${encodeURIComponent(tenantId)}`
+    `/admin/conversations/${encodeURIComponent(sessionId)}?tenant_id=${encodeURIComponent(tenantId)}`
   );
 
 // --- Stats -----------------------------------------------------------
 
-export const getStats = () => request<Stats>("/stats");
-
-// --- Settings ---------------------------------------------------------
-
-export const listSettings = (scope?: string) => {
-  const params = scope ? `?scope=${encodeURIComponent(scope)}` : "";
-  return request<Setting[]>(`/settings${params}`);
-};
-
-export const getSetting = (key: string, scope = "global") =>
-  request<Setting>(`/settings/${encodeURIComponent(key)}?scope=${encodeURIComponent(scope)}`);
-
-export const updateSetting = (key: string, value: string, scope = "global") =>
-  request<Setting>(`/settings/${encodeURIComponent(key)}`, {
-    method: "PUT",
-    body: JSON.stringify({ value, scope }),
-  });
-
-export const revealSetting = (key: string, scope = "global") =>
-  request<{ key: string; value: string }>(
-    `/settings/${encodeURIComponent(key)}/reveal?scope=${encodeURIComponent(scope)}`
-  );
-
-export const deleteSetting = (key: string, scope = "global") =>
-  request<{ ok: boolean }>(
-    `/settings/${encodeURIComponent(key)}?scope=${encodeURIComponent(scope)}`,
-    { method: "DELETE" }
-  );
-
-export const reloadSettings = () =>
-  request<{ ok: boolean; reloaded_at: number }>("/settings/reload", { method: "POST" });
+export const getStats = () => request<Stats>("/admin/stats");
 
 // --- Settings ---------------------------------------------------------
 

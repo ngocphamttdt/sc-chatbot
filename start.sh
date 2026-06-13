@@ -27,6 +27,18 @@ CLIENT="$ROOT/services/client-server"
 ADMIN="$ROOT/services/web-admin"
 LOGS="$ROOT/logs"
 
+# --- 0. Ensure Node.js >= 18 via nvm (Vite requires it) -------------------
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+if command -v nvm &>/dev/null; then
+  NODE_VER=$(node --version 2>/dev/null || echo "v0")
+  NODE_MAJOR="${NODE_VER%%.*}"; NODE_MAJOR="${NODE_MAJOR#v}"
+  if [ "${NODE_MAJOR:-0}" -lt 18 ] 2>/dev/null; then
+    echo "==> Node.js $NODE_VER quá cũ, dùng nvm use 20..."
+    nvm use 20 --silent 2>/dev/null || nvm use 18 --silent 2>/dev/null
+  fi
+fi
+
 FORCE_INSTALL=0
 FORCE_SEED=0
 for arg in "$@"; do

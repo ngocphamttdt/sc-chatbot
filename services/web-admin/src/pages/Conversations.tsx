@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getConversation, listConversations } from "../api";
+import { useAuth } from "../auth";
 import TenantSelector from "../components/TenantSelector";
 import type { ConversationMessage, SessionSummary } from "../types";
 
@@ -10,7 +11,9 @@ function formatTime(ts: number): string {
 }
 
 export default function Conversations() {
-  const [tenantFilter, setTenantFilter] = useState<string | null>(null);
+  const { isAdmin, tenantId: authTenantId } = useAuth();
+  // Tenant users are always scoped to their tenant; admin can filter or view all (null)
+  const [tenantFilter, setTenantFilter] = useState<string | null>(() => isAdmin ? null : authTenantId);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{
     total: number;

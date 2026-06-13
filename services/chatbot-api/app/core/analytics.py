@@ -9,23 +9,25 @@ import time
 from collections import Counter
 from typing import Any
 
-from tinydb import Query, TinyDB
-
 from app.tenancy import TenantContext
 
 
-def _db(tenant: TenantContext) -> TinyDB:
-    return TinyDB(tenant.analytics_db)
+def _col():
+    from app.core.mongo import analytics_events
+    return analytics_events()
 
 
 def track(tenant: TenantContext, event: str, payload: dict[str, Any] | None = None) -> None:
-    with _db(tenant) as db:
-        db.insert({"event": event, "payload": payload or {}, "ts": time.time()})
+    _col().insert_one({
+        "tenant_id": tenant.tenant_id,
+        "event": event,
+        "payload": payload or {},
+        "ts": time.time(),
+    })
 
 
 def report(tenant: TenantContext) -> dict[str, Any]:
-    with _db(tenant) as db:
-        rows = db.all()
+    rows = list(_col().find({"tenant_id": tenant.tenant_id}, {"_id": 0}))
     counts = Counter(r["event"] for r in rows)
 
     latencies = [
@@ -60,13 +62,14 @@ def report(tenant: TenantContext) -> dict[str, Any]:
 
 
 def rate_csat(tenant: TenantContext, session_id: str, score: int) -> None:
-    Q = Query()
     score = max(1, min(5, int(score)))
     track(tenant, "csat_rated", {"session_id": session_id, "score": score})
-    # idempotency-ish: drop older ratings for same session
-    with _db(tenant) as db:
-        ratings = db.search((Q.event == "csat_rated") & (Q.payload.session_id == session_id))
-        if len(ratings) > 1:
-            ratings.sort(key=lambda r: r["ts"])
-            for r in ratings[:-1]:
-                db.remove(doc_ids=[r.doc_id])
+    # Keep only the latest csat per session
+    all_csat = list(
+        _col()
+        .find({"tenant_id": tenant.tenant_id, "event": "csat_rated", "payload.session_id": session_id})
+        .sort("ts", 1)
+    )
+    if len(all_csat) > 1:
+        ids_to_delete = [r["_id"] for r in all_csat[:-1]]
+        _col().delete_many({"_id": {"$in": ids_to_delete}})

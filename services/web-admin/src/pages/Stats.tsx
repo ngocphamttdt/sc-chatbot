@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getStats, listTenants } from "../api";
+import { useAuth } from "../auth";
 import type { Stats, Tenant } from "../types";
 
 function StatCard({
@@ -32,18 +33,23 @@ function Pill({ children }: { children: React.ReactNode }) {
 }
 
 export default function StatsPage() {
+  const { isAdmin, tenantId: authTenantId, displayName } = useAuth();
   const [data, setData] = useState<Stats | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getStats(), listTenants()])
+    const fetches: [Promise<Stats>, Promise<Tenant[]>] = [
+      getStats(),
+      isAdmin ? listTenants() : Promise.resolve([]),
+    ];
+    Promise.all(fetches)
       .then(([s, t]) => {
         setData(s);
         setTenants(t);
       })
       .catch((e) => setError((e as Error).message));
-  }, []);
+  }, [isAdmin]);
 
   if (error)
     return (
@@ -72,15 +78,15 @@ export default function StatsPage() {
       {/* Welcome card */}
       <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6 flex items-center gap-5">
         <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl font-semibold">
-          A
+          {(displayName?.[0] ?? "A").toUpperCase()}
         </div>
         <div className="flex-1">
           <div className="text-sm text-slate-500">Welcome back,</div>
-          <div className="text-xl font-semibold text-slate-900">Admin</div>
+          <div className="text-xl font-semibold text-slate-900">{displayName ?? "Admin"}</div>
           <div className="mt-2 flex flex-wrap gap-2">
-            {tenants.map((t) => (
-              <Pill key={t.tenant_id}>{t.name}</Pill>
-            ))}
+            {isAdmin
+              ? tenants.map((t) => <Pill key={t.tenant_id}>{t.name}</Pill>)
+              : authTenantId && <Pill>{authTenantId}</Pill>}
           </div>
         </div>
       </div>

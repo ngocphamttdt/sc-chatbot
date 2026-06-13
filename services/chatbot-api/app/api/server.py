@@ -3,6 +3,10 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
+
+from contextlib import asynccontextmanager
+import threading
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,12 +30,60 @@ from app.tenancy import get_tenant, list_tenants, register_tenant
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    init_settings()
+async def lifespan(_: FastAPI):
+    # Re-run ingest for any docs stuck in 'processing' from a previous crashed/restarted run
+    def _recover():
+        try:
+            from app.core.mongo import documents as get_col
+            from app.admin.documents import run_ingest
+            stuck = list(get_col().find({"status": "processing"}, {"_id": 0}))
+            for doc in stuck:
+                try:
+                    tenant = get_tenant(doc["tenant_id"])
+                    run_ingest(tenant, doc["id"])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    threading.Thread(target=_recover, daemon=True).start()
     yield
 
 
-app = FastAPI(title="SC Chatbot", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    title="SC Chatbot Admin API",
+    version="1.0.0",
+    description="""
+API quản lý nền tảng chatbot đa tenant SC Chatbot.
+
+## Xác thực
+
+Tất cả endpoint `/admin/*` yêu cầu Bearer token từ `POST /admin/login`:
+
+```
+Authorization: Bearer <token>
+```
+
+## Phân quyền
+
+- **super_admin** — toàn quyền
+- **support** — xem và hỗ trợ
+- **manager / editor / viewer** — tenant users, quyền theo role
+""",
+    openapi_tags=[
+        {"name": "Auth", "description": "Đăng nhập, xác thực token"},
+        {"name": "Tenants", "description": "Quản lý doanh nghiệp (tenant)"},
+        {"name": "Admin Users", "description": "Nhân viên nội bộ platform"},
+        {"name": "Tenant Users", "description": "Nhân viên của từng doanh nghiệp"},
+        {"name": "Roles", "description": "Quản lý roles và phân quyền web-admin"},
+        {"name": "System Prompts", "description": "System prompt chatbot theo tenant"},
+        {"name": "Documents", "description": "Knowledge base — upload & quản lý tài liệu"},
+        {"name": "Conversations", "description": "Lịch sử hội thoại"},
+        {"name": "Stats", "description": "Thống kê dashboard"},
+    ],
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 app.include_router(admin_router)
 
 app.add_middleware(
@@ -73,7 +125,7 @@ def chat(req: ChatRequest):
 
 
 @app.get("/sessions/{session_id}")
-def session(session_id: str, tenant_id: str | None = None):
+def session(session_id: str, tenant_id: Optional[str] = None):
     try:
         tenant = get_tenant(tenant_id)
     except KeyError as e:

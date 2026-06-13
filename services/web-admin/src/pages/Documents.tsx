@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { deleteDocument, listDocuments, uploadDocument } from "../api";
+import { useAuth } from "../auth";
 import TenantSelector from "../components/TenantSelector";
 import type { Document } from "../types";
 
@@ -27,11 +28,16 @@ function statusBadge(s: Document["status"]) {
 }
 
 export default function Documents() {
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const { isAdmin, tenantId: authTenantId, can } = useAuth();
+  // Initialize directly from auth — tenant users don't need TenantSelector to set it
+  const [tenantId, setTenantId] = useState<string | null>(() => isAdmin ? null : authTenantId);
   const [docs, setDocs] = useState<Document[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Ref so polling callback can read latest docs without adding it to deps
+  const docsRef = useRef<Document[]>([]);
+  docsRef.current = docs;
 
   const refresh = async (tid: string) => {
     setError(null);
@@ -45,12 +51,14 @@ export default function Documents() {
   useEffect(() => {
     if (!tenantId) return;
     refresh(tenantId);
-    // Poll while any doc is processing
+    // Poll only when there are processing docs — check via ref to avoid adding docs to deps
     const id = setInterval(() => {
-      if (docs.some((d) => d.status === "processing")) refresh(tenantId);
+      if (docsRef.current.some((d) => d.status === "processing")) {
+        refresh(tenantId);
+      }
     }, 3000);
     return () => clearInterval(id);
-  }, [tenantId, docs]);
+  }, [tenantId]); // docs intentionally excluded — docsRef used instead
 
   const onUpload = async () => {
     const f = fileRef.current?.files?.[0];
@@ -86,27 +94,29 @@ export default function Documents() {
         <TenantSelector value={tenantId} onChange={setTenantId} />
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
-        <h2 className="font-medium text-slate-900">Upload file</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Hỗ trợ PDF / DOCX / TXT / MD, tối đa 20MB. Embedding chạy bất đồng bộ.
-        </p>
-        <div className="mt-4 flex items-center gap-3">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf,.docx,.txt,.md"
-            className="text-sm"
-          />
-          <button
-            onClick={onUpload}
-            disabled={!tenantId || uploading}
-            className="bg-emerald-600 text-white px-4 py-1.5 rounded text-sm hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
-          >
-            {uploading ? "Đang upload…" : "Upload"}
-          </button>
+      {can("documents.write") && (
+        <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
+          <h2 className="font-medium text-slate-900">Upload file</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Hỗ trợ PDF / DOCX / TXT / MD, tối đa 20MB. Embedding chạy bất đồng bộ.
+          </p>
+          <div className="mt-4 flex items-center gap-3">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.docx,.txt,.md"
+              className="text-sm"
+            />
+            <button
+              onClick={onUpload}
+              disabled={!tenantId || uploading}
+              className="bg-emerald-600 text-white px-4 py-1.5 rounded text-sm hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm"
+            >
+              {uploading ? "Đang upload…" : "Upload"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {error && (
         <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
@@ -147,12 +157,14 @@ export default function Documents() {
                 <td className="px-4 py-2 text-right tabular-nums">{formatBytes(d.size_bytes)}</td>
                 <td className="px-4 py-2 text-slate-500">{formatTime(d.uploaded_at)}</td>
                 <td className="px-4 py-2 text-right">
-                  <button
-                    onClick={() => onDelete(d.id)}
-                    className="text-sm text-red-600 hover:underline"
-                  >
-                    Xoá
-                  </button>
+                  {can("documents.write") && (
+                    <button
+                      onClick={() => onDelete(d.id)}
+                      className="text-sm text-red-600 hover:underline"
+                    >
+                      Xoá
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
