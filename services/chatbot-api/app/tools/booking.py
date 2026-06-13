@@ -1,8 +1,4 @@
-"""Booking tools - illustrates Function Calling for travel/tour scenarios.
-
-Mock APIs simulate availability checks ("còn/hết vé"), pricing, and booking
-creation. The agent should ask the user for missing fields before calling.
-"""
+"""Booking tools - illustrates Function Calling for travel/tour scenarios."""
 from __future__ import annotations
 
 import json
@@ -10,14 +6,14 @@ import time
 import uuid
 
 from langchain_core.tools import tool
-from tinydb import Query, TinyDB
 
 from app.core import analytics
 from app.tenancy import TenantContext
 
 
-def _bookings_db(tenant: TenantContext) -> TinyDB:
-    return TinyDB(tenant.bookings_db)
+def _col():
+    from app.core.mongo import bookings
+    return bookings()
 
 
 # Mock tour catalog - in production this would come from a real ERP/API.
@@ -29,9 +25,11 @@ _MOCK_TOURS = {
 
 
 def _booked_count(tenant: TenantContext, tour_code: str, date: str) -> int:
-    Bk = Query()
-    with _bookings_db(tenant) as db:
-        rows = db.search((Bk.tour_code == tour_code) & (Bk.date == date))
+    rows = list(_col().find({
+        "tenant_id": tenant.tenant_id,
+        "tour_code": tour_code,
+        "date": date,
+    }))
     return sum(int(r.get("pax", 0)) for r in rows)
 
 
@@ -85,6 +83,7 @@ def make_booking_tools(tenant: TenantContext):
 
         booking_id = "BK-" + uuid.uuid4().hex[:8].upper()
         record = {
+            "tenant_id": tenant.tenant_id,
             "booking_id": booking_id,
             "tour_code": tour_code,
             "tour_name": tour["name"],
@@ -95,8 +94,7 @@ def make_booking_tools(tenant: TenantContext):
             "created_at": time.time(),
             "status": "confirmed",
         }
-        with _bookings_db(tenant) as db:
-            db.insert(record)
+        _col().insert_one(record)
         analytics.track(tenant, "booking_created", {"booking_id": booking_id})
         return json.dumps(
             {"booking_id": booking_id, "total_price": record["total_price"], "status": "confirmed"},

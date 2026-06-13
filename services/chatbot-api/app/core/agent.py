@@ -16,7 +16,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from langchain.agents import create_agent
+from langgraph.prebuilt import create_react_agent as create_agent
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.admin import configs as admin_configs
@@ -67,7 +67,7 @@ def _build_agent(tenant: TenantContext, kb_context: str):
     return create_agent(
         model=get_chat_model(),
         tools=build_tools(tenant),
-        system_prompt=system_prompt,
+        prompt=system_prompt,
     )
 
 

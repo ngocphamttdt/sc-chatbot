@@ -1,118 +1,16 @@
-"""Cross-tenant rollups for the conversations log + stats dashboard.
-
-Conversation queries dispatch by `STORAGE_BACKEND`. Analytics + tenant
-metadata stay in TinyDB regardless.
-"""
+"""Cross-tenant rollups for the conversations log + stats dashboard."""
 from __future__ import annotations
 
 import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 
-from tinydb import Query, TinyDB
-
-from app.config import settings
-from app.tenancy import get_tenant, list_tenants
+from app.tenancy import list_tenants
 
 
-# --- Conversations: dispatcher --------------------------------------
+# --- Conversations --------------------------------------------------
 
 def list_sessions(tenant_id: str | None, page: int, size: int) -> dict:
-    if settings.storage_backend == "mongo":
-        return _mongo_list_sessions(tenant_id, page, size)
-    return _tinydb_list_sessions(tenant_id, page, size)
-
-
-def get_session_messages(tenant_id: str, session_id: str) -> list[dict]:
-    if settings.storage_backend == "mongo":
-        return _mongo_session_messages(tenant_id, session_id)
-    return _tinydb_session_messages(tenant_id, session_id)
-
-
-def _count_distinct_sessions() -> int:
-    if settings.storage_backend == "mongo":
-        from app.core import mongo
-
-        return len(
-            list(
-                mongo.messages().aggregate(
-                    [{"$group": {"_id": {"t": "$tenant_id", "s": "$session_id"}}}]
-                )
-            )
-        )
-    # TinyDB
-    seen: set[tuple[str, str]] = set()
-    for t in list_tenants():
-        tenant = get_tenant(t["tenant_id"])
-        with TinyDB(tenant.conversations_db) as db:
-            for r in db.all():
-                seen.add((tenant.tenant_id, r["session_id"]))
-    return len(seen)
-
-
-# --- TinyDB queries -------------------------------------------------
-
-def _iter_tenants(tenant_id: str | None):
-    if tenant_id:
-        yield get_tenant(tenant_id)
-        return
-    for t in list_tenants():
-        yield get_tenant(t["tenant_id"])
-
-
-def _tinydb_list_sessions(tenant_id: str | None, page: int, size: int) -> dict:
-    page = max(1, page)
-    size = max(1, min(100, size))
-
-    sessions: dict[tuple[str, str], dict] = {}
-    for tenant in _iter_tenants(tenant_id):
-        with TinyDB(tenant.conversations_db) as db:
-            rows = db.all()
-        for r in rows:
-            key = (tenant.tenant_id, r["session_id"])
-            s = sessions.setdefault(
-                key,
-                {
-                    "session_id": r["session_id"],
-                    "tenant_id": tenant.tenant_id,
-                    "tenant_name": tenant.name,
-                    "turns": 0,
-                    "started_at": r["ts"],
-                    "last_ts": r["ts"],
-                    "last_message": "",
-                    "last_role": "",
-                },
-            )
-            s["turns"] += 1
-            s["started_at"] = min(s["started_at"], r["ts"])
-            if r["ts"] >= s["last_ts"]:
-                s["last_ts"] = r["ts"]
-                s["last_message"] = (r.get("content") or "")[:160]
-                s["last_role"] = r.get("role", "")
-
-    ordered = sorted(sessions.values(), key=lambda s: s["last_ts"], reverse=True)
-    total = len(ordered)
-    start = (page - 1) * size
-    return {
-        "page": page,
-        "size": size,
-        "total": total,
-        "items": ordered[start : start + size],
-    }
-
-
-def _tinydb_session_messages(tenant_id: str, session_id: str) -> list[dict]:
-    tenant = get_tenant(tenant_id)
-    Q = Query()
-    with TinyDB(tenant.conversations_db) as db:
-        rows = db.search(Q.session_id == session_id)
-    rows.sort(key=lambda r: r["ts"])
-    return rows
-
-
-# --- MongoDB queries ------------------------------------------------
-
-def _mongo_list_sessions(tenant_id: str | None, page: int, size: int) -> dict:
     from app.core import mongo
 
     page = max(1, page)
@@ -152,15 +50,10 @@ def _mongo_list_sessions(tenant_id: str | None, page: int, size: int) -> dict:
     ]
     total = len(items_all)
     start = (page - 1) * size
-    return {
-        "page": page,
-        "size": size,
-        "total": total,
-        "items": items_all[start : start + size],
-    }
+    return {"page": page, "size": size, "total": total, "items": items_all[start: start + size]}
 
 
-def _mongo_session_messages(tenant_id: str, session_id: str) -> list[dict]:
+def get_session_messages(tenant_id: str, session_id: str) -> list[dict]:
     from app.core import mongo
 
     cursor = (
@@ -180,9 +73,22 @@ def _mongo_session_messages(tenant_id: str, session_id: str) -> list[dict]:
     ]
 
 
-# --- Stats (mixed: events from TinyDB, sessions from active backend) ----
+def _count_distinct_sessions(tenant_id: str | None = None) -> int:
+    from app.core import mongo
 
-def stats() -> dict:
+    match: dict = {"tenant_id": tenant_id} if tenant_id else {}
+    pipeline = [{"$match": match}, {"$group": {"_id": {"t": "$tenant_id", "s": "$session_id"}}}]
+    return len(list(mongo.messages().aggregate(pipeline)))
+
+
+# --- Stats ----------------------------------------------------------
+
+def stats(tenant_id: str | None = None) -> dict:
+    from app.core.mongo import analytics_events
+
+    query: dict = {"tenant_id": tenant_id} if tenant_id else {}
+    events = list(analytics_events().find(query, {"_id": 0}))
+
     total_orders = 0
     total_bookings = 0
     qa_by_day: Counter[str] = Counter()
@@ -190,31 +96,27 @@ def stats() -> dict:
     csat_scores: list[int] = []
     total_messages_in = 0
 
-    for t in list_tenants():
-        tenant = get_tenant(t["tenant_id"])
-        with TinyDB(tenant.analytics_db) as adb:
-            events = adb.all()
-        for e in events:
-            ev = e["event"]
-            payload = e.get("payload", {}) or {}
-            ts = e.get("ts", 0)
+    for e in events:
+        ev = e["event"]
+        payload = e.get("payload", {}) or {}
+        ts = e.get("ts", 0)
 
-            if ev == "message_in":
-                total_messages_in += 1
-                day = datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat()
-                qa_by_day[day] += 1
-            elif ev == "order_created":
-                total_orders += 1
-            elif ev == "booking_created":
-                total_bookings += 1
-            elif ev == "response_latency_ms":
-                ms = payload.get("ms")
-                if isinstance(ms, (int, float)):
-                    latencies.append(ms)
-            elif ev == "csat_rated":
-                sc = payload.get("score")
-                if isinstance(sc, (int, float)):
-                    csat_scores.append(int(sc))
+        if ev == "message_in":
+            total_messages_in += 1
+            day = datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat()
+            qa_by_day[day] += 1
+        elif ev == "order_created":
+            total_orders += 1
+        elif ev == "booking_created":
+            total_bookings += 1
+        elif ev == "response_latency_ms":
+            ms = payload.get("ms")
+            if isinstance(ms, (int, float)):
+                latencies.append(ms)
+        elif ev == "csat_rated":
+            sc = payload.get("score")
+            if isinstance(sc, (int, float)):
+                csat_scores.append(int(sc))
 
     today = datetime.now(timezone.utc).date()
     qa_per_day = [
@@ -234,12 +136,8 @@ def stats() -> dict:
         "total_orders": total_orders,
         "total_bookings": total_bookings,
         "conversion_rate": round(conversion_rate, 3),
-        "avg_response_latency_ms": round(sum(latencies) / len(latencies), 1)
-        if latencies
-        else 0.0,
-        "avg_csat": round(sum(csat_scores) / len(csat_scores), 2)
-        if csat_scores
-        else None,
+        "avg_response_latency_ms": round(sum(latencies) / len(latencies), 1) if latencies else 0.0,
+        "avg_csat": round(sum(csat_scores) / len(csat_scores), 2) if csat_scores else None,
         "qa_per_day": qa_per_day,
         "generated_at": time.time(),
     }

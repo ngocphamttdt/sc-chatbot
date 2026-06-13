@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import os
+from typing import Optional
 
 from fastapi import Header, HTTPException, status
 
 
-def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
+def require_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
     expected = os.getenv("INTERNAL_API_KEY", "")
     if not expected or x_api_key != expected:
         raise HTTPException(

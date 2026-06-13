@@ -12,35 +12,36 @@ import time
 import uuid
 from pathlib import Path
 
-from tinydb import Query, TinyDB
-
 from app.knowledge import ingest as ingest_pipeline
 from app.tenancy import TenantContext
 
 log = logging.getLogger(__name__)
 
 
+def _col():
+    from app.core.mongo import documents
+    return documents()
+
+
 def list_documents(tenant: TenantContext) -> list[dict]:
-    with TinyDB(tenant.documents_db) as db:
-        rows = db.all()
+    rows = list(_col().find({"tenant_id": tenant.tenant_id}, {"_id": 0}))
     rows.sort(key=lambda r: r.get("uploaded_at", 0), reverse=True)
     return rows
 
 
 def get_document(tenant: TenantContext, doc_id: str) -> dict | None:
-    Q = Query()
-    with TinyDB(tenant.documents_db) as db:
-        return db.get(Q.id == doc_id)
+    return _col().find_one({"tenant_id": tenant.tenant_id, "id": doc_id}, {"_id": 0})
 
 
 def save_upload(tenant: TenantContext, filename: str, content: bytes) -> dict:
     """Persist the file + a `processing` document record."""
     doc_id = uuid.uuid4().hex[:12]
-    safe_name = Path(filename).name  # strip path components
+    safe_name = Path(filename).name
     target = tenant.uploads_dir / f"{doc_id}_{safe_name}"
     target.write_bytes(content)
 
     record = {
+        "tenant_id": tenant.tenant_id,
         "id": doc_id,
         "filename": safe_name,
         "path": str(target),
@@ -50,43 +51,36 @@ def save_upload(tenant: TenantContext, filename: str, content: bytes) -> dict:
         "size_bytes": len(content),
         "error": None,
     }
-    with TinyDB(tenant.documents_db) as db:
-        db.insert(record)
-    return record
+    _col().insert_one(record)
+    return {k: v for k, v in record.items() if k != "_id"}
 
 
 def run_ingest(tenant: TenantContext, doc_id: str) -> None:
     """Sync ingestion. Call from a BackgroundTasks runner so HTTP returns fast."""
-    Q = Query()
-    with TinyDB(tenant.documents_db) as db:
-        rec = db.get(Q.id == doc_id)
+    rec = get_document(tenant, doc_id)
     if not rec:
         log.warning("ingest skipped — doc %s missing", doc_id)
         return
 
     try:
         n = ingest_pipeline.ingest_file(tenant, rec["path"])
-        with TinyDB(tenant.documents_db) as db:
-            db.update(
-                {"status": "done", "chunk_count": n, "error": None},
-                Q.id == doc_id,
-            )
+        _col().update_one(
+            {"tenant_id": tenant.tenant_id, "id": doc_id},
+            {"$set": {"status": "done", "chunk_count": n, "error": None}},
+        )
     except Exception as e:  # noqa: BLE001
         log.exception("ingest failed for doc %s", doc_id)
-        with TinyDB(tenant.documents_db) as db:
-            db.update(
-                {"status": "failed", "error": f"{type(e).__name__}: {e}"},
-                Q.id == doc_id,
-            )
+        _col().update_one(
+            {"tenant_id": tenant.tenant_id, "id": doc_id},
+            {"$set": {"status": "failed", "error": f"{type(e).__name__}: {e}"}},
+        )
 
 
 def delete_document(tenant: TenantContext, doc_id: str) -> bool:
-    Q = Query()
-    with TinyDB(tenant.documents_db) as db:
-        rec = db.get(Q.id == doc_id)
-        if not rec:
-            return False
-        db.remove(Q.id == doc_id)
+    rec = get_document(tenant, doc_id)
+    if not rec:
+        return False
+    _col().delete_one({"tenant_id": tenant.tenant_id, "id": doc_id})
     p = Path(rec.get("path", ""))
     if p.exists():
         try:

@@ -6,23 +6,22 @@ import time
 import uuid
 
 from langchain_core.tools import tool
-from tinydb import Query, TinyDB
 
 from app.core import analytics
 from app.integrations import client_server
 from app.tenancy import TenantContext
 
 
-def _orders(tenant: TenantContext) -> TinyDB:
-    return TinyDB(tenant.orders_db)
+def _orders_col():
+    from app.core.mongo import orders
+    return orders()
 
 
-def _products(tenant: TenantContext) -> TinyDB:
-    return TinyDB(tenant.products_db)
+def _products_col():
+    from app.core.mongo import products
+    return products()
 
 
-# Local mock stock used by create_order — kept until create_order is also wired
-# to client-server. New stock queries go through `check_stock` -> REST.
 _REGIONS = {"HN": "Hà Nội", "HCM": "TP. Hồ Chí Minh", "DN": "Đà Nẵng"}
 
 
@@ -32,19 +31,13 @@ def _stock(sku: str, region: str) -> int:
 
 
 def _resolve_product(query: str) -> dict | None:
-    """Map an LLM-supplied SKU or product name to a real client-server product.
-
-    The model often invents plausible SKUs, so we fall back to matching the
-    query against the live catalogue by id or name substring.
-    """
+    """Map an LLM-supplied SKU or product name to a real client-server product."""
     q = query.strip().lower()
 
-    # 1. Direct SKU hit
     data = client_server.get_stock(query.upper())
     if data is not None:
         return data
 
-    # 2. Match against the live catalogue
     catalog = client_server.list_products()
     for p in catalog:
         if p["id"].lower() == q:
@@ -70,10 +63,7 @@ def make_order_tools(tenant: TenantContext):
             if not catalog:
                 return "Dịch vụ tồn kho đang lỗi, vui lòng thử lại sau."
             options = "; ".join(f"{p['id']} = {p['name']}" for p in catalog)
-            return (
-                f"Không tìm thấy '{product}'. "
-                f"Hãy chọn đúng SKU trong danh sách: {options}"
-            )
+            return f"Không tìm thấy '{product}'. Hãy chọn đúng SKU trong danh sách: {options}"
         return json.dumps(
             {
                 "sku": data["product_id"],
@@ -102,9 +92,9 @@ def make_order_tools(tenant: TenantContext):
         region = region.upper()
         if region not in _REGIONS:
             return f"Khu vực không hỗ trợ. Chỉ nhận: {list(_REGIONS)}."
-        P = Query()
-        with _products(tenant) as db:
-            prod = db.get(P.sku == sku.upper())
+        prod = _products_col().find_one(
+            {"tenant_id": tenant.tenant_id, "sku": sku.upper()}, {"_id": 0}
+        )
         if not prod:
             return f"Không tìm thấy sản phẩm {sku}."
         if _stock(sku, region) < qty:
@@ -113,6 +103,7 @@ def make_order_tools(tenant: TenantContext):
         order_id = "ORD-" + uuid.uuid4().hex[:8].upper()
         total = int(prod.get("price", 0)) * int(qty)
         record = {
+            "tenant_id": tenant.tenant_id,
             "order_id": order_id,
             "sku": sku.upper(),
             "product_name": prod.get("name"),
@@ -124,8 +115,7 @@ def make_order_tools(tenant: TenantContext):
             "status": "confirmed",
             "created_at": time.time(),
         }
-        with _orders(tenant) as db:
-            db.insert(record)
+        _orders_col().insert_one(record)
         analytics.track(tenant, "order_created", {"order_id": order_id, "total": total})
         return json.dumps(
             {"order_id": order_id, "total": total, "status": "confirmed"}, ensure_ascii=False
@@ -134,9 +124,9 @@ def make_order_tools(tenant: TenantContext):
     @tool
     def lookup_order(order_id: str) -> str:
         """Tra cứu trạng thái đơn hàng theo order_id."""
-        O = Query()
-        with _orders(tenant) as db:
-            row = db.get(O.order_id == order_id.upper())
+        row = _orders_col().find_one(
+            {"tenant_id": tenant.tenant_id, "order_id": order_id.upper()}, {"_id": 0}
+        )
         if not row:
             return f"Không tìm thấy đơn {order_id}."
         return json.dumps(row, ensure_ascii=False)

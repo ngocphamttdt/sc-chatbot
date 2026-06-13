@@ -6,7 +6,7 @@ and a private FAISS vector index for its knowledge base.
 """
 from __future__ import annotations
 
-import json
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -72,39 +72,40 @@ def global_settings_db() -> Path:
 
 def register_tenant(tenant_id: str, name: str, industry: str) -> TenantContext:
     """Create / update a tenant entry and ensure its folder exists."""
-    reg_path = _tenants_registry()
-    reg = {}
-    if reg_path.exists():
-        reg = json.loads(reg_path.read_text(encoding="utf-8"))
-    reg[tenant_id] = {"name": name, "industry": industry}
-    reg_path.write_text(json.dumps(reg, ensure_ascii=False, indent=2), encoding="utf-8")
+    from app.core.mongo import get_db
+    now = time.time()
+    get_db().tenants.update_one(
+        {"tenant_id": tenant_id},
+        {
+            "$set": {"name": name, "industry": industry, "updated_at": now},
+            "$setOnInsert": {"tenant_id": tenant_id, "created_at": now},
+        },
+        upsert=True,
+    )
     _load_tenant.cache_clear()
     return _load_tenant(tenant_id)
 
 
 def list_tenants() -> list[dict]:
-    reg_path = _tenants_registry()
-    if not reg_path.exists():
-        return []
-    reg = json.loads(reg_path.read_text(encoding="utf-8"))
-    return [{"tenant_id": k, **v} for k, v in reg.items()]
+    from app.core.mongo import get_db
+    return [
+        {"tenant_id": r["tenant_id"], "name": r["name"], "industry": r.get("industry", "general")}
+        for r in get_db().tenants.find({}, {"_id": 0})
+    ]
 
 
 @lru_cache(maxsize=64)
 def _load_tenant(tenant_id: str) -> TenantContext:
-    reg_path = _tenants_registry()
-    reg = {}
-    if reg_path.exists():
-        reg = json.loads(reg_path.read_text(encoding="utf-8"))
-    meta = reg.get(tenant_id)
-    if not meta:
+    from app.core.mongo import get_db
+    r = get_db().tenants.find_one({"tenant_id": tenant_id})
+    if not r:
         raise KeyError(f"Tenant '{tenant_id}' is not registered.")
     root = settings.data_dir / tenant_id
     root.mkdir(parents=True, exist_ok=True)
     return TenantContext(
         tenant_id=tenant_id,
-        name=meta["name"],
-        industry=meta.get("industry", "general"),
+        name=r["name"],
+        industry=r.get("industry", "general"),
         root=root,
     )
 
