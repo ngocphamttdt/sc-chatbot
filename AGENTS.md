@@ -10,8 +10,8 @@
 # Docker (copy .env.example → .env first)
 cp .env.example .env
 docker compose up --build -d          # TinyDB backend (default)
-docker compose --profile seed up --build -d          # with auto-seed
-docker compose --profile seed --profile mongo up --build -d  # with MongoDB
+docker compose --profile seed up --build -d          # with MongoDB + auto-seed
+docker compose --profile mongo up --build -d         # with MongoDB, no auto-seed
 docker compose down --volumes         # stop + remove volumes
 ```
 
@@ -35,8 +35,8 @@ docker compose down --volumes         # stop + remove volumes
 Usage:
 ```bash
 docker compose up --build -d                 # default (TinyDB)
-docker compose --profile seed up --build -d  # auto-seed KB + tenants
-docker compose --profile seed --profile mongo up --build -d  # MongoDB + seed
+docker compose --profile seed up --build -d  # MongoDB + auto-seed KB + tenants
+docker compose --profile mongo up --build -d # MongoDB, no auto-seed
 ```
 
 ## Key entrypoints

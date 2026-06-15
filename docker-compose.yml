@@ -74,10 +74,13 @@ services:
     environment:
       <<: *shared-env
       CLIENT_SERVER_URL: http://client-server:8001
+      MONGO_URI: mongodb://mongo:27017/scchatbot
     volumes:
       - chatbot-data:/app/data
     depends_on:
       client-server:
+        condition: service_healthy
+      mongo:
         condition: service_healthy
     profiles:
       - seed
@@ -91,6 +94,7 @@ services:
       - mongo-data:/data/db
     profiles:
       - mongo
+      - seed
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]

@@ -1,4 +1,4 @@
-"""Bootstrap two demo tenants and load their products + FAQ into the system.
+"""Bootstrap two demo tenants and load their prompts, products, and FAQ.
 
 Also seeds default settings from env / defaults into the DB.
 
@@ -12,6 +12,7 @@ from pathlib import Path
 
 from tinydb import TinyDB
 
+from app.admin import configs
 from app.config import SETTING_METADATA, settings
 from app.knowledge import ingest
 from app.settings_repository import create_repository
@@ -33,6 +34,13 @@ def _seed_one(tenant_id: str, name: str, industry: str, folder: str) -> dict:
     ctx = register_tenant(tenant_id, name, industry)
     base = ROOT / folder
     n_prod = _load_products(ctx, base / "products.json")
+    prompt_file = base / "system_prompt.md"
+    if prompt_file.exists():
+        configs.seed_prompt_if_missing(
+            ctx,
+            name="Prompt mặc định",
+            content=prompt_file.read_text(encoding="utf-8"),
+        )
 
     # Index products into the KB too, so the bot can answer "công dụng / chống
     # chỉ định" questions purely from RAG without calling get_product.
