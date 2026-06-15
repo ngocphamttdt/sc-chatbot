@@ -80,7 +80,7 @@ Các biến khác (Azure OpenAI / OpenAI) đã có sẵn, giữ nguyên.
 python seed_data.py
 ```
 
-Lệnh này đăng ký 2 tenant `demo-beauty`, `demo-travel`, nạp products + FAQ vào FAISS. Kết quả in ra JSON tóm tắt số chunk đã index.
+Lệnh này đăng ký 2 tenant `demo-beauty`, `demo-travel`, tạo system prompt mẫu nếu tenant chưa có prompt, rồi nạp products + FAQ vào FAISS. Kết quả in ra JSON tóm tắt số chunk đã index.
 
 > Nếu folder `data/` đã có sẵn (đã seed trước đó) thì bỏ qua bước này.
 

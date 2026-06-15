@@ -74,6 +74,30 @@ def set_prompt(tenant: TenantContext, prompt: str) -> None:
     pass
 
 
+def seed_prompt_if_missing(
+    tenant: TenantContext,
+    name: str,
+    content: str,
+) -> None:
+    """Create and activate a seed prompt only when the tenant has no prompts."""
+    now = time.time()
+    get_db().system_prompts.update_one(
+        {"tenant_id": tenant.tenant_id},
+        {
+            "$setOnInsert": {
+                "id": str(uuid.uuid4()),
+                "tenant_id": tenant.tenant_id,
+                "name": name,
+                "content": content.strip(),
+                "is_active": True,
+                "created_at": now,
+                "updated_at": now,
+            }
+        },
+        upsert=True,
+    )
+
+
 def updated_at(tenant: TenantContext) -> float | None:
     r = get_db().system_prompts.find_one({"tenant_id": tenant.tenant_id, "is_active": True})
     return r.get("updated_at") if r else None

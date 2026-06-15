@@ -27,7 +27,14 @@ from app.tenancy import TenantContext
 from app.tools import build_tools
 
 
-SYSTEM_TEMPLATE = """Bạn là trợ lý chăm sóc khách hàng AI của doanh nghiệp {tenant_name} (ngành: {industry}).
+# Header đặt trước phần ngữ cảnh RAG - dùng chung cho cả prompt mặc định lẫn tuỳ biến.
+KB_CONTEXT_HEADER = "Ngữ cảnh liên quan từ kho tri thức (có thể trống):"
+
+# Placeholder tenant được phép dùng trong prompt tuỳ biến - nguồn duy nhất, test import lại.
+SUPPORTED_PLACEHOLDERS = frozenset({"tenant_name", "industry"})
+
+SYSTEM_TEMPLATE = (
+    """Bạn là trợ lý chăm sóc khách hàng AI của doanh nghiệp {tenant_name} (ngành: {industry}).
 
 Nguyên tắc:
 - Trả lời ngắn gọn, thân thiện, bằng tiếng Việt.
@@ -38,9 +45,10 @@ Nguyên tắc:
 - Nếu không chắc, hãy hỏi lại thay vì bịa thông tin.
 - Khi đã tạo đơn thành công, đọc to mã đơn cho khách và xác nhận lại tóm tắt.
 
-Ngữ cảnh liên quan từ kho tri thức (có thể trống):
-{kb_context}
 """
+    + KB_CONTEXT_HEADER
+    + "\n{kb_context}\n"
+)
 
 
 def _kb_context(tenant: TenantContext, query: str, k: int = 3) -> str:
@@ -50,12 +58,22 @@ def _kb_context(tenant: TenantContext, query: str, k: int = 3) -> str:
     return "\n---\n".join(d.page_content for d in docs)
 
 
+def _render_custom_prompt(template: str, tenant: TenantContext) -> str:
+    """Render the supported tenant placeholders without interpreting braces."""
+    values = {"tenant_name": tenant.name, "industry": tenant.industry}
+    for placeholder in SUPPORTED_PLACEHOLDERS:
+        template = template.replace("{" + placeholder + "}", values[placeholder])
+    return template
+
+
 def _build_agent(tenant: TenantContext, kb_context: str):
     custom = admin_configs.get_prompt(tenant)
     if custom:
         system_prompt = (
-            custom
-            + "\n\nNgữ cảnh liên quan từ kho tri thức (có thể trống):\n"
+            _render_custom_prompt(custom, tenant)
+            + "\n\n"
+            + KB_CONTEXT_HEADER
+            + "\n"
             + kb_context
         )
     else:

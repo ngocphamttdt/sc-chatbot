@@ -60,7 +60,7 @@ sc-chatbot/
     ├── chatbot-api/         # === Bộ não AI ===
     │   ├── run.py                  # entry point HTTP server (port 8000)
     │   ├── telegram_worker.py      # worker polling Telegram
-    │   ├── seed_data.py            # seed tenant demo + knowledge base
+    │   ├── seed_data.py            # seed tenant demo + prompt + knowledge base
     │   ├── migrate_history_to_mongo.py
     │   ├── app/
     │   │   ├── config.py           # đọc .env
