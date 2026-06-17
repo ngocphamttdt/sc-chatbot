@@ -16,7 +16,7 @@ import type {
 } from "./types";
 import { hashPassword } from "./crypto";
 
-const BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 const TOKEN_KEY = "sc_admin_token";
 

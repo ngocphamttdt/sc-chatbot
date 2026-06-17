@@ -31,6 +31,7 @@ from app.tenancy import get_tenant, list_tenants, register_tenant
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    init_settings()
     # Re-run ingest for any docs stuck in 'processing' from a previous crashed/restarted run
     def _recover():
         try:
