@@ -3,7 +3,7 @@ WORKDIR /build
 COPY services/web-admin/package*.json ./
 RUN npm ci
 COPY services/web-admin/ .
-ARG VITE_API_BASE_URL="/api"
+ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build
 

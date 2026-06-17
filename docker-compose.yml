@@ -28,7 +28,7 @@ services:
       context: .
       dockerfile: services/chatbot-api/Dockerfile
       args:
-        VITE_API_BASE_URL: "/api"
+        VITE_API_BASE_URL: ""
     ports:
       - "${CHATBOT_API_PORT:-8000}:8000"
     environment:
