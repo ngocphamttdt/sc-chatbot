@@ -53,6 +53,14 @@ jobs:
             CLIENT_SERVER_PORT=${{ env.CLIENT_SERVER_PORT }}
             EOF
 
+            echo "--- Remove stale TinyDB settings so seed re-runs fresh ---"
+            docker compose down 2>/dev/null || true
+            VOLUME_PATH=$(docker volume inspect sc-chatbot_chatbot-data --format '{{.Mountpoint}}' 2>/dev/null || echo "")
+            if [ -n "$VOLUME_PATH" ] && [ -f "$VOLUME_PATH/global_settings.json" ]; then
+              rm -f "$VOLUME_PATH/global_settings.json"
+              echo "Removed stale global_settings.json"
+            fi
+
             echo "--- Rebuild and start services ---"
             docker compose --profile seed up --build -d
 

@@ -8,6 +8,7 @@ import {
   DocsIcon,
   LogoIcon,
   PromptIcon,
+  SettingsIcon,
   ShieldIcon,
   UsersIcon,
 } from "./Icons";
@@ -30,7 +31,8 @@ const NAV_MAIN: NavItem[] = [
 const NAV_ADMIN: NavItem[] = [
   { to: "/tenants", label: "Doanh nghiệp", icon: BuildingIcon },
   { to: "/users",   label: "Nhân viên",    icon: UsersIcon },
-  { to: "/roles",   label: "Roles", icon: ShieldIcon },
+  { to: "/roles",   label: "Roles",    icon: ShieldIcon },
+  { to: "/settings", label: "Cấu hình", icon: SettingsIcon },
 ];
 
 const ROLE_LABELS: Record<string, string> = {

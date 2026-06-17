@@ -65,6 +65,7 @@ export default function App() {
         <Route path="tenants/:tenantId/users" element={<RequireAdmin><TenantUsers /></RequireAdmin>} />
         <Route path="users"               element={<RequireAdmin><Users /></RequireAdmin>} />
         <Route path="roles"               element={<RequireAdmin><Roles /></RequireAdmin>} />
+        <Route path="settings"            element={<RequireAdmin><Settings /></RequireAdmin>} />
         <Route path="not-found" element={<NotFound />} />
       </Route>
       <Route path="*" element={<Navigate to="/not-found" replace />} />
