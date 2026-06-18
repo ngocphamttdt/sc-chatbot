@@ -131,7 +131,7 @@ def stats(tenant_id: str | None = None) -> dict:
     conversion_rate = (conversions / total_messages_in) if total_messages_in else 0.0
 
     return {
-        "total_conversations": _count_distinct_sessions(),
+        "total_conversations": _count_distinct_sessions(tenant_id),
         "total_messages_in": total_messages_in,
         "total_orders": total_orders,
         "total_bookings": total_bookings,

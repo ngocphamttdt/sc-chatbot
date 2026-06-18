@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getStats, listTenants } from "../api";
 import { useAuth } from "../auth";
+import TenantSelector from "../components/TenantSelector";
 import type { Stats, Tenant } from "../types";
 
 function StatCard({
@@ -37,10 +38,14 @@ export default function StatsPage() {
   const [data, setData] = useState<Stats | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Admin defaults to "all" (null); tenant users are locked to their own tenant
+  const [tenantFilter, setTenantFilter] = useState<string | null>(() =>
+    isAdmin ? null : authTenantId
+  );
 
   useEffect(() => {
     const fetches: [Promise<Stats>, Promise<Tenant[]>] = [
-      getStats(),
+      getStats(tenantFilter),
       isAdmin ? listTenants() : Promise.resolve([]),
     ];
     Promise.all(fetches)
@@ -49,7 +54,7 @@ export default function StatsPage() {
         setTenants(t);
       })
       .catch((e) => setError((e as Error).message));
-  }, [isAdmin]);
+  }, [isAdmin, tenantFilter]);
 
   if (error)
     return (
@@ -73,7 +78,14 @@ export default function StatsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold mb-6">Dashboard</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <TenantSelector
+          allowAll
+          value={tenantFilter}
+          onChange={(v) => setTenantFilter(v || null)}
+        />
+      </div>
 
       {/* Welcome card */}
       <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6 flex items-center gap-5">

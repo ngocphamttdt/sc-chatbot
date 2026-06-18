@@ -643,7 +643,11 @@ def put_prompt_legacy(req: PromptConfigUpdate, claims: dict = Depends(auth.requi
     tags=["Stats"],
     summary="Thống kê tổng quan dashboard",
 )
-def get_stats(claims: dict = Depends(auth.require_permission("stats.read"))):
-    # Tenant users only see stats for their own tenant
-    tenant_id = claims.get("tenant_id") if claims.get("user_type") == "tenant" else None
+def get_stats(
+    tenant_id: Optional[str] = Query(default=None),
+    claims: dict = Depends(auth.require_permission("stats.read")),
+):
+    # Tenant users are locked to their own tenant; admins pass tenant_id (None = all)
+    if claims.get("user_type") == "tenant":
+        tenant_id = claims.get("tenant_id")
     return aggregations.stats(tenant_id)
