@@ -645,9 +645,10 @@ def put_prompt_legacy(req: PromptConfigUpdate, claims: dict = Depends(auth.requi
 )
 def get_stats(
     tenant_id: Optional[str] = Query(default=None),
+    days: int = Query(default=30, ge=1, le=365),
     claims: dict = Depends(auth.require_permission("stats.read")),
 ):
     # Tenant users are locked to their own tenant; admins pass tenant_id (None = all)
     if claims.get("user_type") == "tenant":
         tenant_id = claims.get("tenant_id")
-    return aggregations.stats(tenant_id)
+    return aggregations.stats(tenant_id, days)
