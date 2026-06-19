@@ -95,7 +95,11 @@ def make_booking_tools(tenant: TenantContext):
             "status": "confirmed",
         }
         _col().insert_one(record)
-        analytics.track(tenant, "booking_created", {"booking_id": booking_id})
+        analytics.track(
+            tenant,
+            "booking_created",
+            {"booking_id": booking_id, "total_price": record["total_price"]},
+        )
         return json.dumps(
             {"booking_id": booking_id, "total_price": record["total_price"], "status": "confirmed"},
             ensure_ascii=False,

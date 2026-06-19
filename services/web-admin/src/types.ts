@@ -132,9 +132,17 @@ export type Stats = {
   total_messages_in: number;
   total_orders: number;
   total_bookings: number;
+  gmv: number;
+  aov: number;
   conversion_rate: number;
   avg_response_latency_ms: number;
+  p50_response_latency_ms: number;
+  p95_response_latency_ms: number;
   avg_csat: number | null;
+  top_skus: { sku: string; count: number }[];
+  top_questions: { query: string; count: number }[];
+  peak_hours: { hour: number; count: number }[];
   qa_per_day: { date: string; count: number }[];
+  orders_per_day: { date: string; count: number }[];
   generated_at: number;
 };

@@ -229,7 +229,13 @@ export const getConversation = (tenantId: string, sessionId: string) =>
 
 // --- Stats -----------------------------------------------------------
 
-export const getStats = () => request<Stats>("/admin/stats");
+export const getStats = (tenantId?: string | null, days?: number) => {
+  const params = new URLSearchParams();
+  if (tenantId) params.set("tenant_id", tenantId);
+  if (days) params.set("days", String(days));
+  const qs = params.toString();
+  return request<Stats>(`/admin/stats${qs ? `?${qs}` : ""}`);
+};
 
 // --- Settings ---------------------------------------------------------
 
