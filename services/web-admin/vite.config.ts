@@ -1,28 +1,18 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const API_TARGET = "http://localhost:8000";
+
 export default defineConfig({
   plugins: [react()],
-  base: "/admin/",
+  base: "/",
   server: {
     port: 5173,
     proxy: {
-      "/admin": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/tenants": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/chat": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
-      "/health": {
-        target: "http://127.0.0.1:8000",
-        changeOrigin: true,
-      },
+      "/admin": { target: API_TARGET, changeOrigin: true },
+      "/tenants": { target: API_TARGET, changeOrigin: true },
+      "/chat": { target: API_TARGET, changeOrigin: true },
+      "/health": { target: API_TARGET, changeOrigin: true },
     },
   },
 });

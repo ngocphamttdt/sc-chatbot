@@ -18,12 +18,13 @@ docker compose down --volumes         # stop + remove volumes
 ## Services (all in `services/`)
 | Directory | Stack | Port | Entry |
 |---|---|---|---|
-| `chatbot-api/` | FastAPI + LangChain + FAISS + TinyDB | 8000 | `python run.py` + `python telegram_worker.py` |
+| `chatbot-api/` | FastAPI + LangChain + FAISS + TinyDB/MongoDB | 8000 | `python run.py` |
+| `telegram-worker` | (same image, separate process) | — | `python telegram_worker.py` |
 | `client-server/` | FastAPI (mock business API) | 8001 | `python run.py` |
-| `web-admin/` | React + Vite + TypeScript + Tailwind | 5173 | `npm run dev` |
+| `web-admin/` | React + Vite + TypeScript + Tailwind (nginx) | 30001 / 5173 (dev) | `npm run dev` / Docker |
 
-- Shared `.venv` at repo root (not per-service).
-- Each service has `run.py` entrypoint, `.env.example` → copy to `.env`, own `requirements.txt`.
+All services run on **separate ports/domains** — web-admin is NOT bundled into chatbot-api.
+Communication is via HTTP (CORS). Set `VITE_API_BASE_URL` in `services/web-admin/.env` to point to chatbot-api.
 
 ## Docker Compose profiles
 | Profile | Effect |
@@ -46,10 +47,10 @@ docker compose --profile mongo up --build -d # MongoDB, no auto-seed
 - `services/chatbot-api/migrate_history_to_mongo.py` — migrate TinyDB → MongoDB
 
 ## Architecture notes
-- chatbot-api = multi-tenant AI brain: LangChain agent + RAG (FAISS per tenant) + TinyDB chat history.
+- chatbot-api = multi-tenant AI brain: LangChain agent + RAG (FAISS per tenant) + chat history.
 - Tools (`product.py`, `order.py`, `booking.py`) still call TinyDB directly, **not** client-server REST (except `check_stock`). Refactoring that is pending.
 - client-server is a mock — in-memory store, restart loses orders/bookings.
-- web-admin talks to chatbot-api `/admin/*` endpoints (JWT auth).
+- web-admin runs as **separate domain** (nginx or Vite dev server), calls chatbot-api `/admin/*` endpoints via HTTP (CORS).
 - Telegram user sessions use `tg-{user_id}` as session_id.
 
 ## Config (`.env` per service)
@@ -57,10 +58,11 @@ docker compose --profile mongo up --build -d # MongoDB, no auto-seed
 - **Storage**: `STORAGE_BACKEND=tinydb` (default, no infra) or `mongo`
 - **Auth**: `INTERNAL_API_KEY` shared between chatbot-api ↔ client-server (header `X-API-Key`); `JWT_SECRET` + `ADMIN_USER`/`ADMIN_PASSWORD` for web-admin login
 - **Telegram**: `TELEGRAM_BOT_TOKEN` required for Telegram worker
+- **Admin SPA**: `VITE_API_BASE_URL` in `services/web-admin/.env` — URL of chatbot-api (e.g. `http://localhost:8000`)
 
 ## CI/CD — GitHub Actions deploy
 
-A deploy workflow (`.github/workflows/deploy.yml`) auto-deploys on push to `main` or `ci-cd-workflow`.
+A deploy workflow (`.github/workflows/deploy.yml`) auto-deploys on `workflow_dispatch`.
 
 ### Required GitHub Secrets
 
@@ -94,7 +96,7 @@ cp services/web-admin/.env.example services/web-admin/.env
 2. Workflow SSHes into the host and runs `git pull`.
 3. Writes `.env` with port overrides from secrets.
 4. Runs `docker compose --profile seed up --build -d`.
-5. Health-checks `chatbot-api` (retries up to 60s).
+5. Health-checks `chatbot-api` (retries up to 60s), then `web-admin` (up to 30s).
 6. Prunes Docker images older than 24h.
 
 ## No tests, no linter, no typecheck

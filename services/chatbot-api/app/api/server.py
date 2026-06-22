@@ -4,14 +4,10 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
-
-from contextlib import asynccontextmanager
 import threading
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from app.admin.routes import router as admin_router
 from app.api.schemas import (
@@ -188,43 +184,12 @@ def csat(req: CSATRequest):
     return {"ok": True}
 
 
-# --- Static SPA (web-admin) at /admin ----------------------------------
-
-STATIC_UI_DIR = Path(__file__).resolve().parents[2] / "static" / "web-admin"
-if STATIC_UI_DIR.exists():
-    app.mount(
-        "/admin/assets",
-        StaticFiles(directory=str(STATIC_UI_DIR / "assets")),
-        name="admin-ui-assets",
-    )
-
-    _API_PATHS = {"health", "tenants", "chat", "ingest", "analytics", "csat", "sessions", "docs", "openapi.json"}
-
-    @app.get("/admin/{full_path:path}")
-    async def admin_ui_spa(full_path: str):
-        path = full_path.rstrip("/")
-        if path in _API_PATHS or path.startswith("api/"):
-            return JSONResponse({"detail": "Not Found"}, status_code=404)
-        file_path = STATIC_UI_DIR / full_path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(str(file_path))
-        index_file = STATIC_UI_DIR / "index.html"
-        if index_file.exists():
-            return FileResponse(str(index_file))
-        return JSONResponse({"detail": "Not Found"}, status_code=404)
-
-    @app.get("/admin")
-    async def admin_ui_root():
-        index_file = STATIC_UI_DIR / "index.html"
-        if index_file.exists():
-            return FileResponse(str(index_file))
-        return JSONResponse({"detail": "Not Found"}, status_code=404)
-
 _UI_PATH = Path(__file__).resolve().parents[2] / "ui" / "index.html"
 
 
 @app.get("/")
 def ui_root():
     if _UI_PATH.exists():
+        from fastapi.responses import FileResponse
         return FileResponse(_UI_PATH)
-    return {"hint": "Trang quản trị tại /admin. POST /chat để trò chuyện với bot."}
+    return {"hint": "Trang quản trị chạy riêng trên domain khác. POST /chat để trò chuyện với bot."}

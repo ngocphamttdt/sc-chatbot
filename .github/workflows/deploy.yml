@@ -67,10 +67,19 @@ jobs:
             echo "--- Health check ---"
             for i in $(seq 1 12); do
               if curl -sf http://localhost:${{ env.CHATBOT_API_PORT }}/health > /dev/null 2>&1; then
-                echo "Health check passed"
+                echo "chatbot-api health check passed"
                 break
               fi
               echo "Waiting for chatbot-api (attempt $i/12)..."
+              sleep 5
+            done
+
+            for i in $(seq 1 6); do
+              if curl -sf http://localhost:${{ env.WEB_ADMIN_PORT }}/ > /dev/null 2>&1; then
+                echo "web-admin health check passed"
+                break
+              fi
+              echo "Waiting for web-admin (attempt $i/6)..."
               sleep 5
             done
 
