@@ -1,0 +1,78 @@
+[
+  {
+    "order_id": "ORD-0001",
+    "status": "confirmed",
+    "items": [
+      {
+        "product_id": "BTY-HR16",
+        "qty": 1,
+        "price": 320000,
+        "name": "Tinh dầu dưỡng tóc Argan Oil 80ml"
+      }
+    ],
+    "customer": {
+      "name": "Ngọc",
+      "phone": "0342933499",
+      "address": "392 lữ gia- phường hòa hưng- hcm"
+    },
+    "total": 320000,
+    "created_at": "2026-06-23T15:52:20.937648+00:00"
+  },
+  {
+    "order_id": "ORD-0002",
+    "status": "confirmed",
+    "items": [
+      {
+        "product_id": "BTY-LP43",
+        "qty": 1,
+        "price": 235000,
+        "name": "Son dưỡng Collagen Lip Care"
+      }
+    ],
+    "customer": {
+      "name": "Ngọc",
+      "phone": "12343",
+      "address": "89 hoa hung, tan bình, tp hcm"
+    },
+    "total": 235000,
+    "created_at": "2026-06-23T15:55:24.013643+00:00"
+  },
+  {
+    "order_id": "ORD-0003",
+    "status": "confirmed",
+    "items": [
+      {
+        "product_id": "BTY-LP38",
+        "qty": 1,
+        "price": 175000,
+        "name": "Tẩy tế bào chết môi Sugar Scrub"
+      }
+    ],
+    "customer": {
+      "name": "Ngọc",
+      "phone": "12343",
+      "address": "89 hoa hung, tan bình, tp hcm"
+    },
+    "total": 175000,
+    "created_at": "2026-06-23T15:55:26.459769+00:00"
+  },
+  {
+    "order_id": "ORD-0004",
+    "status": "confirmed",
+    "items": [
+      {
+        "product_id": "BTY-LP38",
+        "qty": 2,
+        "price": 175000,
+        "name": "Tẩy tế bào chết môi Sugar Scrub"
+      }
+    ],
+    "customer": {
+      "name": "Tân",
+      "phone": "398234",
+      "address": "1a lưu nhân chú, tân bình, HCM"
+    },
+    "total": 350000,
+    "created_at": "2026-06-23T16:09:42.930196+00:00"
+  }
+]

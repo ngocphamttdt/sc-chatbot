@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import time
-import uuid
 
 from langchain_core.tools import tool
 
@@ -16,18 +15,6 @@ def _orders_col():
     from app.core.mongo import orders
     return orders()
 
-
-def _products_col():
-    from app.core.mongo import products
-    return products()
-
-
-_REGIONS = {"HN": "Hà Nội", "HCM": "TP. Hồ Chí Minh", "DN": "Đà Nẵng"}
-
-
-def _stock(sku: str, region: str) -> int:
-    h = abs(hash(sku.upper() + region.upper())) % 30
-    return h  # 0..29
 
 
 def _resolve_product(query: str) -> dict | None:
@@ -82,43 +69,43 @@ def make_order_tools(tenant: TenantContext):
         customer_name: str,
         phone: str,
         address: str,
-        region: str,
     ) -> str:
         """Tạo đơn hàng mới. AI phải hỏi đủ thông tin trước khi gọi tool.
 
-        Bắt buộc: sku, qty, customer_name, phone, address, region.
+        Bắt buộc: sku, qty, customer_name, phone, address.
         Trả về order_id và tổng tiền nếu thành công.
         """
-        region = region.upper()
-        if region not in _REGIONS:
-            return f"Khu vực không hỗ trợ. Chỉ nhận: {list(_REGIONS)}."
-        prod = _products_col().find_one(
-            {"tenant_id": tenant.tenant_id, "sku": sku.upper()}, {"_id": 0}
-        )
+        prod = _resolve_product(sku)
         if not prod:
-            return f"Không tìm thấy sản phẩm {sku}."
-        if _stock(sku, region) < qty:
-            return "Tồn kho không đủ cho khu vực này, đề nghị giảm số lượng hoặc đổi khu vực."
+            return f"Không tìm thấy sản phẩm {sku} trong hệ thống."
 
-        order_id = "ORD-" + uuid.uuid4().hex[:8].upper()
-        total = int(prod.get("price", 0)) * int(qty)
+        try:
+            result = client_server.create_order(
+                product_id=prod["product_id"],
+                qty=qty,
+                customer={"name": customer_name, "phone": phone, "address": address},
+            )
+        except ValueError:
+            return "Sản phẩm hiện không còn hàng."
+
         record = {
             "tenant_id": tenant.tenant_id,
-            "order_id": order_id,
-            "sku": sku.upper(),
+            "order_id": result["order_id"],
+            "sku": prod["product_id"],
             "product_name": prod.get("name"),
             "qty": qty,
             "unit_price": prod.get("price"),
-            "total": total,
+            "total": result["total"],
             "customer": {"name": customer_name, "phone": phone},
-            "shipping": {"address": address, "region": _REGIONS[region]},
-            "status": "confirmed",
+            "shipping": {"address": address},
+            "status": result["status"],
             "created_at": time.time(),
         }
         _orders_col().insert_one(record)
-        analytics.track(tenant, "order_created", {"order_id": order_id, "total": total})
+        analytics.track(tenant, "order_created", {"order_id": result["order_id"], "total": result["total"]})
         return json.dumps(
-            {"order_id": order_id, "total": total, "status": "confirmed"}, ensure_ascii=False
+            {"order_id": result["order_id"], "total": result["total"], "status": result["status"]},
+            ensure_ascii=False,
         )
 
     @tool

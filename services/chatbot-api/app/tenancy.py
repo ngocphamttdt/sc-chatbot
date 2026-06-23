@@ -34,10 +34,6 @@ class TenantContext:
         return str(self.root / "orders.json")
 
     @property
-    def products_db(self) -> str:
-        return str(self.root / "products.json")
-
-    @property
     def analytics_db(self) -> str:
         return str(self.root / "analytics.json")
 

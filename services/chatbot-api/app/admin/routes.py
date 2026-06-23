@@ -525,7 +525,7 @@ async def upload_document(
     except KeyError:
         raise HTTPException(404, {"error": "tenant not found"})
 
-    allowed = {".pdf", ".docx", ".txt", ".md"}
+    allowed = {".pdf", ".docx", ".txt", ".md", ".json"}
     suffix = "." + (file.filename or "").rsplit(".", 1)[-1].lower()
     if suffix not in allowed:
         raise HTTPException(400, {"error": f"unsupported file type {suffix}; allowed: {sorted(allowed)}"})

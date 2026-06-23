@@ -21,6 +21,8 @@ export type Document = {
   uploaded_at: number;
   size_bytes: number;
   error: string | null;
+  doc_type?: "product_catalog";
+  product_count?: number;
 };
 
 export type PromptConfig = {

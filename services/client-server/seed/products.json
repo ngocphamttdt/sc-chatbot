@@ -3,24 +3,264 @@
     "id": "BTY-SR01",
     "name": "Serum Vitamin C 20ml",
     "price": 480000,
-    "stock": 25
+    "stock": 35
   },
   {
     "id": "BTY-CR02",
     "name": "Kem chống nắng SPF50 PA++++ 50ml",
     "price": 320000,
-    "stock": 0
+    "stock": 82
   },
   {
     "id": "BTY-MK03",
     "name": "Son lì Velvet Matte #03 Đỏ Đất",
     "price": 290000,
-    "stock": 18
+    "stock": 46
   },
   {
     "id": "BTY-CL04",
     "name": "Sữa rửa mặt dịu nhẹ pH 5.5 150ml",
     "price": 195000,
     "stock": 60
+  },
+  {
+    "id": "BTY-TN05",
+    "name": "Nước hoa hồng Cica Balance 200ml",
+    "price": 260000,
+    "stock": 54
+  },
+  {
+    "id": "BTY-MS06",
+    "name": "Kem dưỡng ẩm Ceramide Repair 50ml",
+    "price": 420000,
+    "stock": 31
+  },
+  {
+    "id": "BTY-MS07",
+    "name": "Tinh chất Niacinamide 10% 30ml",
+    "price": 390000,
+    "stock": 42
+  },
+  {
+    "id": "BTY-MS08",
+    "name": "Mặt nạ ngủ Hyaluronic Aqua 80ml",
+    "price": 350000,
+    "stock": 27
+  },
+  {
+    "id": "BTY-MS09",
+    "name": "Tẩy trang Micellar Clean 400ml",
+    "price": 210000,
+    "stock": 75
+  },
+  {
+    "id": "BTY-MS10",
+    "name": "Tẩy tế bào chết AHA 7% 100ml",
+    "price": 430000,
+    "stock": 29
+  },
+  {
+    "id": "BTY-MS11",
+    "name": "Kem mắt Peptide Repair 20ml",
+    "price": 460000,
+    "stock": 22
+  },
+  {
+    "id": "BTY-MS12",
+    "name": "Serum Retinol 0.3% 30ml",
+    "price": 580000,
+    "stock": 18
+  },
+  {
+    "id": "BTY-HR13",
+    "name": "Dầu gội Biotin Volume 500ml",
+    "price": 285000,
+    "stock": 58
+  },
+  {
+    "id": "BTY-HR14",
+    "name": "Dầu xả Keratin Smooth 500ml",
+    "price": 295000,
+    "stock": 55
+  },
+  {
+    "id": "BTY-HR15",
+    "name": "Ủ tóc Collagen Repair 300ml",
+    "price": 365000,
+    "stock": 33
+  },
+  {
+    "id": "BTY-HR16",
+    "name": "Tinh dầu dưỡng tóc Argan Oil 80ml",
+    "price": 320000,
+    "stock": 37
+  },
+  {
+    "id": "BTY-HR17",
+    "name": "Xịt dưỡng tóc Protein Silk 150ml",
+    "price": 245000,
+    "stock": 49
+  },
+  {
+    "id": "BTY-HR18",
+    "name": "Serum mọc tóc Herbal Root 50ml",
+    "price": 520000,
+    "stock": 16
+  },
+  {
+    "id": "BTY-HR19",
+    "name": "Kem ủ tóc Coconut Therapy 250ml",
+    "price": 280000,
+    "stock": 44
+  },
+  {
+    "id": "BTY-LP20",
+    "name": "Son dưỡng Lip Balm Berry",
+    "price": 145000,
+    "stock": 96
+  },
+  {
+    "id": "BTY-LP21",
+    "name": "Son dưỡng có màu Peach Glow",
+    "price": 175000,
+    "stock": 73
+  },
+  {
+    "id": "BTY-LP22",
+    "name": "Son lì Velvet Matte #01 Đỏ Ruby",
+    "price": 290000,
+    "stock": 41
+  },
+  {
+    "id": "BTY-LP23",
+    "name": "Son lì Velvet Matte #05 Hồng Nude",
+    "price": 290000,
+    "stock": 38
+  },
+  {
+    "id": "BTY-LP24",
+    "name": "Son kem Velvet Ink #07 Cam Cháy",
+    "price": 315000,
+    "stock": 34
+  },
+  {
+    "id": "BTY-LP25",
+    "name": "Son bóng Crystal Shine",
+    "price": 260000,
+    "stock": 47
+  },
+  {
+    "id": "BTY-MU26",
+    "name": "Kem nền Soft Matte Foundation",
+    "price": 520000,
+    "stock": 23
+  },
+  {
+    "id": "BTY-MU27",
+    "name": "Phấn phủ Air Silk Powder",
+    "price": 380000,
+    "stock": 39
+  },
+  {
+    "id": "BTY-MU28",
+    "name": "Má hồng Soft Blush #02",
+    "price": 295000,
+    "stock": 52
+  },
+  {
+    "id": "BTY-MU29",
+    "name": "Phấn tạo khối Contour Palette",
+    "price": 450000,
+    "stock": 21
+  },
+  {
+    "id": "BTY-MU30",
+    "name": "Mascara Curl & Volume",
+    "price": 265000,
+    "stock": 43
+  },
+  {
+    "id": "BTY-MU31",
+    "name": "Kẻ mắt Waterproof Liner",
+    "price": 220000,
+    "stock": 66
+  },
+  {
+    "id": "BTY-MU32",
+    "name": "Chì kẻ mày Natural Brown",
+    "price": 180000,
+    "stock": 71
+  },
+  {
+    "id": "BTY-BD33",
+    "name": "Sữa tắm Hương Hoa Anh Đào 500ml",
+    "price": 230000,
+    "stock": 57
+  },
+  {
+    "id": "BTY-BD34",
+    "name": "Kem dưỡng thể Shea Butter 250ml",
+    "price": 295000,
+    "stock": 36
+  },
+  {
+    "id": "BTY-LP35",
+    "name": "Son dưỡng Lip Therapy Honey",
+    "price": 165000,
+    "stock": 88
+  },
+  {
+    "id": "BTY-LP36",
+    "name": "Son dưỡng Lip Repair Overnight",
+    "price": 225000,
+    "stock": 45
+  },
+  {
+    "id": "BTY-LP37",
+    "name": "Son dưỡng SPF30 Daily Protect",
+    "price": 185000,
+    "stock": 63
+  },
+  {
+    "id": "BTY-LP38",
+    "name": "Tẩy tế bào chết môi Sugar Scrub",
+    "price": 175000,
+    "stock": 51
+  },
+  {
+    "id": "BTY-LP39",
+    "name": "Son dưỡng Lip Glow Rose",
+    "price": 210000,
+    "stock": 56
+  },
+  {
+    "id": "BTY-LP40",
+    "name": "Son dưỡng Cocoa Butter Balm",
+    "price": 155000,
+    "stock": 79
+  },
+  {
+    "id": "BTY-LP41",
+    "name": "Son dưỡng Lip Oil Cherry",
+    "price": 245000,
+    "stock": 40
+  },
+  {
+    "id": "BTY-LP42",
+    "name": "Son dưỡng Lip Butter Vanilla",
+    "price": 195000,
+    "stock": 68
+  },
+  {
+    "id": "BTY-LP43",
+    "name": "Son dưỡng Collagen Lip Care",
+    "price": 235000,
+    "stock": 48
+  },
+  {
+    "id": "BTY-LP44",
+    "name": "Son dưỡng Lip Balm Mint Fresh",
+    "price": 160000,
+    "stock": 84
   }
 ]
