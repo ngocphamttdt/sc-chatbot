@@ -98,13 +98,13 @@ export default function Documents() {
         <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
           <h2 className="font-medium text-slate-900">Upload file</h2>
           <p className="text-sm text-slate-500 mt-1">
-            Hỗ trợ PDF / DOCX / TXT / MD, tối đa 20MB. Embedding chạy bất đồng bộ.
+            Hỗ trợ PDF / DOCX / TXT / MD / JSON (product catalog), tối đa 20MB. Embedding chạy bất đồng bộ.
           </p>
           <div className="mt-4 flex items-center gap-3">
             <input
               ref={fileRef}
               type="file"
-              accept=".pdf,.docx,.txt,.md"
+              accept=".pdf,.docx,.txt,.md,.json"
               className="text-sm"
             />
             <button
@@ -129,6 +129,7 @@ export default function Documents() {
           <thead className="bg-gray-50 text-slate-600 text-xs uppercase">
             <tr>
               <th className="text-left px-4 py-2">Filename</th>
+              <th className="text-left px-4 py-2">Type</th>
               <th className="text-left px-4 py-2">Status</th>
               <th className="text-right px-4 py-2">Chunks</th>
               <th className="text-right px-4 py-2">Size</th>
@@ -139,7 +140,7 @@ export default function Documents() {
           <tbody>
             {docs.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                   Chưa có document nào.
                 </td>
               </tr>
@@ -147,6 +148,17 @@ export default function Documents() {
             {docs.map((d) => (
               <tr key={d.id} className="border-t border-gray-100">
                 <td className="px-4 py-2 font-medium text-slate-900">{d.filename}</td>
+                <td className="px-4 py-2">
+                  {d.doc_type === "product_catalog" ? (
+                    <span className="text-xs px-2 py-0.5 rounded border bg-violet-100 text-violet-800 border-violet-200">
+                      product catalog {d.product_count != null ? `(${d.product_count})` : ""}
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2 py-0.5 rounded border bg-gray-100 text-gray-600 border-gray-200">
+                      document
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2">
                   {statusBadge(d.status)}
                   {d.error && (

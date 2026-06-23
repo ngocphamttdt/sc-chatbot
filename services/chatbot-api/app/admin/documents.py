@@ -13,6 +13,7 @@ import uuid
 from pathlib import Path
 
 from app.knowledge import ingest as ingest_pipeline
+from app.knowledge.ingest import is_product_catalog
 from app.tenancy import TenantContext
 
 log = logging.getLogger(__name__)
@@ -64,9 +65,14 @@ def run_ingest(tenant: TenantContext, doc_id: str) -> None:
 
     try:
         n = ingest_pipeline.ingest_file(tenant, rec["path"])
+        extra: dict = {}
+        if is_product_catalog(rec["path"]):
+            import json as _json
+            products = _json.loads(Path(rec["path"]).read_text(encoding="utf-8"))
+            extra = {"doc_type": "product_catalog", "product_count": len(products)}
         _col().update_one(
             {"tenant_id": tenant.tenant_id, "id": doc_id},
-            {"$set": {"status": "done", "chunk_count": n, "error": None}},
+            {"$set": {"status": "done", "chunk_count": n, "error": None, **extra}},
         )
     except Exception as e:  # noqa: BLE001
         log.exception("ingest failed for doc %s", doc_id)

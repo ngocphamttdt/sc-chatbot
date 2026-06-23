@@ -156,6 +156,7 @@ def init_settings(
     rows = repo.list(scope="global")
     if rows:
         settings._load_from_repo()
+        #settings._load_from_env()  # env vars always win over DB
     else:
         for key in SETTING_METADATA:
             val = getattr(settings, key)
