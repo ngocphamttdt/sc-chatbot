@@ -50,7 +50,7 @@ services:
     build:
       context: ./services/web-admin
       args:
-        VITE_API_BASE_URL: http://localhost:${CHATBOT_API_PORT:-8000}
+        VITE_API_BASE_URL: ""
     ports:
       - "${WEB_ADMIN_PORT:-30001}:80"
     depends_on:
